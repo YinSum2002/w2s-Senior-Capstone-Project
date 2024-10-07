@@ -14,7 +14,7 @@ while True:
     print("UV Index: ", uv_sensor.uv_index)
     print("UVA: ", uv_sensor.uva)
     print("UVB: ", uv_sensor.uvb)
-    
+
     time.sleep(10)
 
 
@@ -30,14 +30,16 @@ i2c = busio.I2C(board.GP5, board.GP4)  # Update with your correct pins
 # Initialize the sensor
 uv_sensor = adafruit_veml6075.VEML6075(i2c)
 
+
 # Function to get UV data and return it as a dictionary
 def get_uv_data():
     uv_data = {
-        'uv_index': uv_sensor.uv_index,
-        'uva': uv_sensor.uva,
-        'uvb': uv_sensor.uvb
+        "uv_index": uv_sensor.uv_index,
+        "uva": uv_sensor.uva,
+        "uvb": uv_sensor.uvb,
     }
     return uv_data
+
 
 # Main loop
 while True:
