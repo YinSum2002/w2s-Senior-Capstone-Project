@@ -1,6 +1,8 @@
 import time
 import json
 
+# from get_uv import get_uv_data
+
 
 # Simulating sensor data (replace these functions with actual sensor reading logic)
 def get_temperature():
@@ -20,6 +22,7 @@ def main():
     # Gather sensor data
     temperature = get_temperature()
     humidity = get_humidity()
+    # uv = get_uv_data()
 
     # Create the data dictionary to be written to the JSON file
     sensor_data = {

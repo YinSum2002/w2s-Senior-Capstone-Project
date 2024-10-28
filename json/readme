@@ -1,0 +1,8 @@
+I don't know if this is the right place to do it, but I really need to straighten out the exact tasks that need to be completed by the main processor.
+The high level overview is that it needs to be taking data from all modules and sorting into a JSON package. The details any further than that get a bit murky.
+It seems that we don't yet have the modules working yet, which will make it difficult to actually test this. But we have drawn a few conclusions so far.
+The first is that it will not be feasible to take all measurements at the same time. They must be done sequentially. The way I'd suggest doing this goes as follows.
+Create a list of all modules. Have the main function of your processor itterate through this list, and on each module, run the file to get the measurement, and store that measurement in the JSON file.
+The biggest challenge will likely be to find an environment where both the modules and the processor can run. The final version of this will see us pushing all the code to the microcontroller. 
+I envision this as a system where the main processor file runs first and simply calls the other files. The big question here is how do we wire up all modules to the microcontroller so that they can all run,
+but do not interfere with eachother? Do we know IF we can do this? This is very important for the PCB layout and needs to be done ASAP. This is your singular task for right now.

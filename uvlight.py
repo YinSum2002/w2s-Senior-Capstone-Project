@@ -25,7 +25,7 @@ import adafruit_veml6075
 import json  # Import the JSON module
 
 # Set up I2C bus
-i2c = busio.I2C(board.GP5, board.GP4)  # Update with your correct pins
+i2c = busio.I2C(board.GP5, board.GP4)  # Update with your correct pins. SDA to GP4, SCL to GP5
 
 # Initialize the sensor
 uv_sensor = adafruit_veml6075.VEML6075(i2c)
