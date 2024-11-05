@@ -35,26 +35,62 @@ async def receive_data(characteristic):
 
 
 async def run_central_mode():
-    device = await ble_scan()
-    if not device:
-        print("No Peripheral found.")
-        return
+    """Run the central mode to connect to the peripheral and receive data."""
 
-    try:
-        print(f"Connecting to {device.name()}")
-        connection = await device.device.connect()
-    except asyncio.TimeoutError:
-        print("Connection timed out.")
-        return
+    # Start scanning for a device with the matching service UUID
+    while True:
+        device = await ble_scan()
 
-    async with connection:
+        if device is None:
+            print("No device found, retrying scan...")
+            continue
+        print(f"Device found: {device}, name: {device.name()}")
+
         try:
-            service = await connection.service(_SERVICE_UUID)
-            characteristic = await service.characteristic(_CHARACTERISTIC_UUID)
-            await receive_data(characteristic)
-        except Exception as e:
-            print(f"Error discovering service/characteristic: {e}")
-            await connection.disconnect()
+            print(f"Attempting to connect to {device.name()}...")
+            connection = await device.device.connect()
+
+        except asyncio.TimeoutError:
+            print("Connection timeout.")
+            continue
+
+        print(f"Connected to {device.name()} as {IAM}")
+
+        # Discover services
+        async with connection:
+            try:
+                service = await connection.service(BLE_SVC_UUID)
+                if service is None:
+                    print("Service not found. Disconnecting and retrying.")
+                    await connection.disconnect()
+                    continue  # Restart the connection attempt
+
+                characteristic = await service.characteristic(BLE_CHARACTERISTIC_UUID)
+                if characteristic is None:
+                    print("Characteristic not found. Disconnecting and retrying.")
+                    await connection.disconnect()
+                    continue  # Restart the connection attempt
+
+                print("Service and characteristic found. Ready to receive data.")
+
+            except (asyncio.TimeoutError, AttributeError) as e:
+                print(f"Error discovering services/characteristics: {e}")
+                await connection.disconnect()
+                continue
+            except Exception as e:
+                print(f"Unexpected error discovering services: {e}")
+                await connection.disconnect()
+                continue
+
+            # Run the task to receive data from the peripheral
+            tasks = [
+                asyncio.create_task(receive_data_task(characteristic)),
+            ]
+            await asyncio.gather(*tasks)
+
+            await connection.disconnected()
+            print(f"Disconnected from {device.name()}")
+            break  # End loop if successfully disconnected
 
 
 asyncio.run(run_central_mode())
