@@ -1,11 +1,15 @@
 import time
 import machine
+from machine import Pin, I2C
 
 # Define AM2320 I2C address
 AM2320_ADDR = 0x5C
 
 # Initialize the I2C bus
-i2c = machine.I2C(1, scl=machine.Pin(22), sda=machine.Pin(21))
+print(machine.Pin(17))
+print(machine.Pin(16))
+i2c = I2C(0, scl=Pin(17), sda=Pin(16))
+#i2c = machine.I2C(1, scl=machine.Pin(17), sda=machine.Pin(16))
 
 def read_am2320():
     try:

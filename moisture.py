@@ -2,7 +2,7 @@ from machine import ADC, Pin
 import time
 
 # Set up the soil moisture sensor
-soil_moisture_pin = ADC(Pin(26))  # Use GP26 (ADC0)
+soil_moisture_pin = ADC(Pin(27))  # Use GP26 (ADC0)
 
 # Function to read the moisture level
 def read_moisture():

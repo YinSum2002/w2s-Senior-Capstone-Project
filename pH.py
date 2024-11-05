@@ -2,7 +2,7 @@ from machine import ADC, Pin
 import time
 
 # Set up the ADC (assuming you're using pin 31, which is ADC0)
-ph_adc = ADC(Pin(27))  # ADC0 corresponds to GP26
+ph_adc = ADC(Pin(26))  # ADC0 corresponds to GP26
 
 # Calibration values (you may need to adjust these based on your sensor)
 offset = 0.0
