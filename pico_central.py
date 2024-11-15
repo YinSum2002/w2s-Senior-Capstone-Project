@@ -24,6 +24,10 @@ async def receive_data(characteristic):
     try:
         print("Receiving data...")
         json_bytes = await characteristic.read()
+        
+        # Print raw data received
+        print(f"Raw data received: {json_bytes}")
+        
         json_data = ujson.loads(json_bytes.decode("utf-8"))
 
         print("Data received and parsed:")
@@ -42,30 +46,31 @@ async def run_central_mode():
         device = await ble_scan()
 
         if device is None:
-            print("No device found, retrying scan...")
-            continue
-        print(f"Device found: {device}, name: {device.name()}")
+            print("No device found")
+            return
+        #print(f"Device found: {device}, name: {device.name()}")
 
         try:
             print(f"Attempting to connect to {device.name()}...")
             connection = await device.device.connect()
+            await asyncio.sleep(0.5)  # Short delay before service discovery
 
         except asyncio.TimeoutError:
             print("Connection timeout.")
-            continue
+            return
 
-        print(f"Connected to {device.name()} as {IAM}")
+        print(f"Connected to {device.name()}")
 
         # Discover services
         async with connection:
             try:
-                service = await connection.service(BLE_SVC_UUID)
+                service = await connection.service(_SERVICE_UUID)
                 if service is None:
                     print("Service not found. Disconnecting and retrying.")
                     await connection.disconnect()
                     continue  # Restart the connection attempt
 
-                characteristic = await service.characteristic(BLE_CHARACTERISTIC_UUID)
+                characteristic = await service.characteristic(_CHARACTERISTIC_UUID)
                 if characteristic is None:
                     print("Characteristic not found. Disconnecting and retrying.")
                     await connection.disconnect()
@@ -84,7 +89,7 @@ async def run_central_mode():
 
             # Run the task to receive data from the peripheral
             tasks = [
-                asyncio.create_task(receive_data_task(characteristic)),
+                asyncio.create_task(receive_data(characteristic)),
             ]
             await asyncio.gather(*tasks)
 

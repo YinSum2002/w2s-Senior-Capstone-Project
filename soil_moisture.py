@@ -9,7 +9,7 @@ WaterValue = 318
 intervals = (AirValue - WaterValue) // 3
 
 # Initialize the ADC for the pin (GP26 = ADC0)
-soil_moisture_sensor = ADC(Pin(26))
+soil_moisture_sensor = ADC(Pin(27))
 
 # Function to read the sensor value
 def read_soil_moisture():
