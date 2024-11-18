@@ -6,21 +6,9 @@ import am2320
 
 # Set up I2C (you can choose either I2C0 or I2C1)
 i2c = I2C(0, scl=Pin(17), sda=Pin(16), freq=100000)  # Configure for I2C0 with SCL=GP5, SDA=GP4
-#i2c = busio.I2C(board.GP17, board.GP16)
 
 # AM2320 I2C address
 AM2320_ADDR = 0x5C
-
-# Configure slow device clock speed
-# Wake up the sensor
-# i2c.writeto(AM2320_ADDR, b'\x03\x00\x04')
-
-# devices = i2c.scan()
-# 
-# if devices:
-#     print("I2C device(s) found:", [hex(device) for device in devices])
-# else:
-#     print("No I2C devices found")
 
 def read_am2320():
     try:
@@ -47,9 +35,14 @@ def read_am2320():
         #print("Failed to read from AM2320:", e)
         return None, None
 
-# Main loop to read and display the sensor data
-while True:
-    humidity, temperature = read_am2320()
-    if humidity is not None and temperature is not None:
-        print(f"Humidity: {humidity:.1f}%, Temperature: {temperature:.1f}°C")
-    time.sleep(1)
+def temp_humid():
+    # Main loop to read and display the sensor data
+    while True:
+        for _ in range(1):
+            humidity, temperature = read_am2320()
+            if humidity is not None and temperature is not None:
+                print(f"Humidity: {humidity:.1f}%, Temperature: {temperature:.1f}°C")
+            time.sleep(10)
+            return temperature, humidity
+
+print(temp_humid())

@@ -18,11 +18,13 @@ def read_ph():
     # Calculate pH based on the voltage (you may need to adjust the formula)
     # For example, if 0V corresponds to pH 0 and 3.3V corresponds to pH 14:
     ph_value = voltage * 14.0 / 3.3 + offset
-    
+    print("pH: ", ph_value)
     return ph_value
 
 # Main loop
-while True:
-    ph = read_ph()
-    print(f"pH Value: {ph:.2f}")
-    time.sleep(1)
+#while True:
+    #ph = read_ph()
+    #print(f"pH Value: {ph:.2f}")
+    #time.sleep(1)
+
+read_ph()

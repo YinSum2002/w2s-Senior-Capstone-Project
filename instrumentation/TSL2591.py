@@ -23,9 +23,13 @@ else:
 # Initialize the sensor to the 0th channel on the multiplexer
 sensor = adafruit_tsl2591.TSL2591(i2c) # how do I address a specific device for these i2c busses
 
-# Main loop
-while True:
-    lux = sensor.lux
-    print("Lux:", lux)
-    
-    time.sleep(1)
+def lux(sensor):
+    # Main loop
+    #while True:
+    for _ in range(1):
+        lux = sensor.lux
+        print("Lux:", lux)
+
+        time.sleep(1)
+
+lux(sensor)
