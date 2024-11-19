@@ -8,14 +8,14 @@ import temp_humid
 def make_array(sensor_function):
     sensor_array = []
     for _ in range(3):
-        #print(sensor_function)
         sensor_array.append(sensor_function)
     return sensor_array
 
 def main():
     sensor_values = []
     
-    sensor_values.append(make_array(uvlight.read_uv()))
+#    sensor_values.append(make_array(uvlight.read_uv()))
+
     sensor_values.append(make_array(pH.read_ph()))
     sensor_values.append(make_array(TSL2591.light()))
     sensor_values.append(make_array(soil_moisture.read_soil_moisture()))
