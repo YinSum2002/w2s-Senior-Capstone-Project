@@ -21,18 +21,18 @@ def read_soil_moisture():
 
 def moist():
     # Main loop
-    while True:
+    #while True:
     #for _ in range(1):
-        soilMoistureValue = read_soil_moisture()  # Read sensor value
-        print("Soil Moisture Value:", soilMoistureValue)
+    soilMoistureValue = read_soil_moisture()  # Read sensor value
+    print("Soil Moisture Value:", soilMoistureValue)
 
-        if WaterValue < soilMoistureValue < (WaterValue + intervals):
-            print("Very Wet")
-        elif (WaterValue + intervals) < soilMoistureValue < (AirValue - intervals):
-            print("Wet")
-        elif (AirValue - intervals) < soilMoistureValue < AirValue:
-            print("Dry")
+    if WaterValue < soilMoistureValue < (WaterValue + intervals):
+        print("Very Wet")
+    elif (WaterValue + intervals) < soilMoistureValue < (AirValue - intervals):
+        print("Wet")
+    elif (AirValue - intervals) < soilMoistureValue < AirValue:
+        print("Dry")
+    return(soilMoistureValue)
+    sleep(0.1)  # Delay for 100ms (similar to Arduino delay)
 
-        sleep(0.1)  # Delay for 100ms (similar to Arduino delay)
-
-moist()
+#moist()

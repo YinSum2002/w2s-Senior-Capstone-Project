@@ -45,4 +45,4 @@ def temp_humid():
             time.sleep(10)
             return temperature, humidity
 
-print(temp_humid())
+#print(temp_humid())
