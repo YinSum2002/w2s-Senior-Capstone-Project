@@ -93,6 +93,8 @@ class VEML6075(object):
 	def uv_index(self):
 		"""The calculated UV Index"""
 		self._take_reading()
+		print("UVA: ", self._uvacalc)
+		print("UVA: ", self._uvbcalc)
 		return ((self._uvacalc * self._uvaresp) + (self._uvbcalc * self._uvbresp)) / 2
 
 	@property
