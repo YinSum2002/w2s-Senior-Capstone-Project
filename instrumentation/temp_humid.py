@@ -29,20 +29,23 @@ def read_am2320():
         if data[4] & 0x80:
             temperature = -temperature
 
+        if (humidity, temperature) != (None, None):
+            #print("equal statement true")
+            return humidity, temperature
+        
+        
+        
+        if (humidity, temperature) == (None, None):
+            print("calling function again")
+            read_am2320()
+
+        
         return humidity, temperature
 
     except OSError as e:
         #print("Failed to read from AM2320:", e)
-        return None, None
+        #return None, None
+        pass
 
-def temp_humid():
-    # Main loop to read and display the sensor data
-    while True:
-        for _ in range(1):
-            humidity, temperature = read_am2320()
-            if humidity is not None and temperature is not None:
-                print(f"Humidity: {humidity:.1f}%, Temperature: {temperature:.1f}°C")
-            time.sleep(10)
-            return temperature, humidity
-
-#print(temp_humid())
+for _ in range(10):
+    read_am2320()

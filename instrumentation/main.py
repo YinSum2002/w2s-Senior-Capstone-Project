@@ -14,12 +14,10 @@ def make_array(sensor_function):
 def main():
     sensor_values = []
     
-    sensor_values.append(make_array(uvlight.read_uv()))
-# 
+    sensor_values.append(make_array(uvlight.read_uv())) 
     sensor_values.append(make_array(pH.read_ph()))
     sensor_values.append(make_array(TSL2591.light()))
     sensor_values.append(make_array(soil_moisture.read_soil_moisture()))
-#     
     sensor_values.append(make_array(temp_humid.read_am2320()))
 
     print(sensor_values)
