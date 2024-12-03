@@ -6,7 +6,7 @@ import adafruit_tca9548a
 
 def light():
     # Set up I2C bus
-    i2c = busio.I2C(board.GP7, board.GP6)  # Use your I2C pins
+    i2c = busio.I2C(board.GP5, board.GP4)  # Use your I2C pins
     time.sleep(1)
     
     tca = adafruit_tca9548a.TCA9548A(i2c)
