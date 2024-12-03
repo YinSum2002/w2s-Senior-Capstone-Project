@@ -11,6 +11,13 @@ print(machine.Pin(16))
 i2c = I2C(0, scl=Pin(17), sda=Pin(16))
 #i2c = machine.I2C(1, scl=machine.Pin(17), sda=machine.Pin(16))
 
+devices = i2c.scan()
+
+if devices:
+    print("I2C device(s) found:", [hex(device) for device in devices])
+else:
+    print("No I2C devices found")
+
 def read_am2320():
     try:
         # Step 1: Wake up the sensor (send a dummy write)

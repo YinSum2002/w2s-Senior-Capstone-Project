@@ -42,13 +42,6 @@ def read_am2320():
         return None, None
 
 while True:
-    devices = i2c.scan()
-
-    if devices:
-        print("I2C device(s) found:", [hex(device) for device in devices])
-    else:
-        print("No I2C devices found")
-    
     temperature, humidity = read_am2320()
     if temperature is not None and humidity is not None:
         print("Temperature:", temperature)

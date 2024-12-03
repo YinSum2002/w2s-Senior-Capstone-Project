@@ -4,20 +4,32 @@ import busio
 import adafruit_veml6075
 import veml6075
 from machine import I2C, Pin
-#import adafruit_tca9548a
 
-#i2c = I2C(0x01, sda=Pin(6), scl=Pin(7))
-#sensor = veml6075.VEML6075(i2c=i2c)
-#while True:
+import machine
+import time
+
+# Test GP4 (SDA)
+# pin = machine.Pin(5, machine.Pin.OUT)
+# while True:
+#     pin.value(1)
+#     time.sleep(0.5)
+#     pin.value(0)
+#     time.sleep(0.5)
+
+# Repeat for GP5 (SCL)
+
 def read_uv():
-    i2c = I2C(0x01, sda=Pin(6), scl=Pin(7))
+    print("reading uv")
+    i2c = I2C(0, scl=Pin(5), sda=Pin(4))  # I2C0 on Pico W
+    
+    print("Scanning I2C devices...")
+    devices = i2c.scan()
+    print("Found I2C devices:", [hex(dev) for dev in devices])    
+    
     sensor = veml6075.VEML6075(i2c=i2c)
-    #for _ in range(1):
-        #print("uv_index: ", sensor.uv_index)
+
+    #print(sensor.uv_index)
     return (sensor.uv_index, sensor.uva, sensor.uvb)
 
-# def hello_there(str):
-#     print(str)
-# 
-# for _ in range(10):
-#     print(read_uv())
+print(read_uv())
+#read_uv()

@@ -21,8 +21,4 @@ def read_ph():
     
     return ph_value
 
-# Main loop
-#while True:
-#ph = read_ph()
-#print(f"pH Value: {ph:.2f}")
 time.sleep(1)
