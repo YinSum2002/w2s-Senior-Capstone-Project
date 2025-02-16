@@ -4,18 +4,18 @@
 #include <Adafruit_TSL2591.h>
 #include <Adafruit_VEML6075.h>
 
-#define PH_SENSOR_PIN 0  // GPIO 0 connected to the sensor's analog output
-#define SOIL_MOISTURE_PIN 1  // GPIO 1 connected to the sensor's analog output
-#define LED_PIN 2     // LED indicator
-#define BUTTON_PIN 4  // Push button
+#define PH_SENSOR_PIN 2  // GPIO 0 connected to the sensor's analog output
+#define SOIL_MOISTURE_PIN 3  // GPIO 1 connected to the sensor's analog output
+
+#define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
+#define TIME_TO_SLEEP  15        /* Time ESP32 will go to sleep (in seconds) */
+
+RTC_DATA_ATTR int bootCount = 0;
 
 // Create sensor instances
 Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591);
 Adafruit_VEML6075 uv = Adafruit_VEML6075();
 Adafruit_AHTX0 aht;
-
-// ON/OFF flag
-bool systemState = false; 
 
 void configureSensor() {
   // Set gain and integration time for the TSL2591
@@ -35,16 +35,45 @@ const unsigned long AHT_INTERVAL = 30 * 1000; // 30 seconds in milliseconds
 const unsigned long PH_INTERVAL = 60 * 1000;  // 60 seconds in milliseconds
 const unsigned long CSMS_INTERVAL = 60 * 1000; // 60 seconds in milliseconds
 
+void print_wakeup_reason(){
+  esp_sleep_wakeup_cause_t wakeup_reason;
+
+  wakeup_reason = esp_sleep_get_wakeup_cause();
+
+  switch(wakeup_reason)
+  {
+    case ESP_SLEEP_WAKEUP_EXT0 : Serial.println("Wakeup caused by external signal using RTC_IO"); break;
+    case ESP_SLEEP_WAKEUP_EXT1 : Serial.println("Wakeup caused by external signal using RTC_CNTL"); break;
+    case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Wakeup caused by timer"); break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD : Serial.println("Wakeup caused by touchpad"); break;
+    case ESP_SLEEP_WAKEUP_ULP : Serial.println("Wakeup caused by ULP program"); break;
+    default : Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
+  }
+}
+
 void setup() {
-    // Enable internal pull-up resistor
-    pinMode(BUTTON_PIN, INPUT_PULLUP); 
-    pinMode(LED_PIN, OUTPUT);
-    
     Serial.begin(115200);
+    delay(1000); //Take some time to open up the Serial Monitor
+
+    //Increment boot number and print it every reboot
+    ++bootCount;
+    Serial.println("Boot number: " + String(bootCount));
+
+    //Print the wakeup reason for ESP32
+    print_wakeup_reason();
+
+    /*
+    First we configure the wake up source
+    We set our ESP32 to wake up every 5 seconds
+    */
+    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+    Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) +
+    " Seconds");
+
     while (!Serial);
     
-    // Initialize I2C GPIO 6 (SCL) and GPIO 7 (SDA)
-    Wire.begin(7, 6);
+    // Initialize I2C GPIO 8 (SCL) and GPIO 9 (SDA)
+    Wire.begin(9, 8);
 
     // Initialize the AHT20 Sensor
     if (!aht.begin()) {
@@ -70,117 +99,100 @@ void setup() {
 }
 
 void loop() {
+    unsigned long currentTime = millis(); // Get the current time
 
-    static bool lastButtonState = HIGH; // Track previous state
+          // Run the TSL2591 sensor every 15 minutes
+    if (currentTime - previousTSLTime >= TSL_INTERVAL) {
+        previousTSLTime = currentTime;
 
-    // Read the button state
-    bool buttonState = digitalRead(BUTTON_PIN);
-    
-    // Detect button press (transition from HIGH to LOW)
-    if (buttonState == LOW && lastButtonState == HIGH) {
-        systemState = !systemState; // Toggle the state
-        digitalWrite(LED_PIN, systemState ? HIGH : LOW); // Update LED
-        Serial.println(systemState ? "System ON" : "System OFF");
-        delay(200); // Debounce delay
-    }  
-    lastButtonState = buttonState;
+        // Get full-spectrum (visible + IR) and IR-only light levels
+        uint32_t full = tsl.getFullLuminosity();
+        uint16_t visible = full & 0xFFFF;
+        uint16_t infrared = full >> 16;
 
-    if (systemState) {
-      unsigned long currentTime = millis(); // Get the current time
+        // Calculate Lux from the sensor readings
+        float lux = tsl.calculateLux(visible, infrared);
 
-            // Run the TSL2591 sensor every 15 minutes
-      if (currentTime - previousTSLTime >= TSL_INTERVAL) {
-          previousTSLTime = currentTime;
+        // Print TSL2591 readings
+        Serial.print(F("Visible Light: ")); Serial.print(visible);
+        Serial.print(F(" | Infrared: ")); Serial.print(infrared);
+        Serial.print(F(" | Lux: ")); Serial.println(lux);
+    }
 
-          // Get full-spectrum (visible + IR) and IR-only light levels
-          uint32_t full = tsl.getFullLuminosity();
-          uint16_t visible = full & 0xFFFF;
-          uint16_t infrared = full >> 16;
+    // Run the VEML6075 sensor every 15 minutes
+    if (currentTime - previousVEMLTime >= VEML_INTERVAL) {
+        previousVEMLTime = currentTime;
 
-          // Calculate Lux from the sensor readings
-          float lux = tsl.calculateLux(visible, infrared);
+        // Read UVA, UVB, and calculate UV Index
+        float uva = uv.readUVA();
+        float uvb = uv.readUVB();
+        float uvIndex = uv.readUVI();
 
-          // Print TSL2591 readings
-          Serial.print(F("Visible Light: ")); Serial.print(visible);
-          Serial.print(F(" | Infrared: ")); Serial.print(infrared);
-          Serial.print(F(" | Lux: ")); Serial.println(lux);
-      }
+        // Print the readings to the Serial Monitor
+        Serial.print("UVA: ");
+        Serial.print(uva);
+        Serial.print(" | UVB: ");
+        Serial.print(uvb);
+        Serial.print(" | UV Index: ");
+        Serial.println(uvIndex);
+    }
 
-      // Run the VEML6075 sensor every 15 minutes
-      if (currentTime - previousVEMLTime >= VEML_INTERVAL) {
-          previousVEMLTime = currentTime;
+    // Run the AHT20 sensor every 30 minutes
+    if (currentTime - previousAHTTime >= AHT_INTERVAL) {
+        previousAHTTime = currentTime;
 
-          // Read UVA, UVB, and calculate UV Index
-          float uva = uv.readUVA();
-          float uvb = uv.readUVB();
-          float uvIndex = uv.readUVI();
+        sensors_event_t humidity, temp;
+        aht.getEvent(&humidity, &temp);
 
-          // Print the readings to the Serial Monitor
-          Serial.print("UVA: ");
-          Serial.print(uva);
-          Serial.print(" | UVB: ");
-          Serial.print(uvb);
-          Serial.print(" | UV Index: ");
-          Serial.println(uvIndex);
-      }
+        // Print AHT20 readings
+        Serial.print("Temp: "); Serial.print(temp.temperature); Serial.println(" °C");
+        Serial.print("Humidity: "); Serial.print(humidity.relative_humidity); Serial.println(" %");
+    }
 
-      // Run the AHT20 sensor every 30 minutes
-      if (currentTime - previousAHTTime >= AHT_INTERVAL) {
-          previousAHTTime = currentTime;
+    // Run the pH sensor every 1 hour
+    if (currentTime - previousPHTime >= PH_INTERVAL) {
+        previousPHTime = currentTime;
 
-          sensors_event_t humidity, temp;
-          aht.getEvent(&humidity, &temp);
+        // Read the raw ADC value from the pH sensor
+        int raw_value = analogRead(PH_SENSOR_PIN);
 
-          // Print AHT20 readings
-          Serial.print("Temp: "); Serial.print(temp.temperature); Serial.println(" °C");
-          Serial.print("Humidity: "); Serial.print(humidity.relative_humidity); Serial.println(" %");
-      }
+        // Convert raw value to voltage (ESP32 ADC resolution is 12-bit by default)
+        float voltage = (raw_value / 4095.0) * 3.3;
 
-      // Run the pH sensor every 1 hour
-      if (currentTime - previousPHTime >= PH_INTERVAL) {
-          previousPHTime = currentTime;
+        // Convert the voltage to pH value using calibration
+        float pH = 3.5 * voltage;  // Adjust the multiplier and offset as needed
 
-          // Read the raw ADC value from the pH sensor
-          int raw_value = analogRead(PH_SENSOR_PIN);
+        // Print pH readings
+        Serial.print("Raw ADC Value: ");
+        Serial.print(raw_value);
+        Serial.print(" | Voltage: ");
+        Serial.print(voltage, 2);
+        Serial.print(" V | pH: ");
+        Serial.println(pH, 2);
+    }
 
-          // Convert raw value to voltage (ESP32 ADC resolution is 12-bit by default)
-          float voltage = (raw_value / 4095.0) * 3.3;
+    // Run the Moisture sensor every 1 hour
+    if (currentTime - previousCSMSTime >= CSMS_INTERVAL) {
+        previousCSMSTime = currentTime;
 
-          // Convert the voltage to pH value using calibration
-          float pH = 3.5 * voltage;  // Adjust the multiplier and offset as needed
+        // Read the raw analog value from the sensor
+        int raw_value = analogRead(SOIL_MOISTURE_PIN);
 
-          // Print pH readings
-          Serial.print("Raw ADC Value: ");
-          Serial.print(raw_value);
-          Serial.print(" | Voltage: ");
-          Serial.print(voltage, 2);
-          Serial.print(" V | pH: ");
-          Serial.println(pH, 2);
-      }
+        // Convert the raw value to a percentage (assuming 0-100%)
+        // Calibration: You may need to determine the min (dry) and max (wet) raw values for your sensor
+        float min_raw = 0;   // Replace with your dry calibration value
+        float max_raw = 4095; // Replace with your wet calibration value (for ESP32 ADC resolution)
 
-      // Run the Moisture sensor every 1 hour
-      if (currentTime - previousCSMSTime >= CSMS_INTERVAL) {
-          previousCSMSTime = currentTime;
+        // Map the raw value to a percentage
+        float moisture_percent = map(raw_value, min_raw, max_raw, 0, 100);
+        moisture_percent = constrain(moisture_percent, 0, 100); // Ensure the value stays within 0-100%
 
-          // Read the raw analog value from the sensor
-          int raw_value = analogRead(SOIL_MOISTURE_PIN);
-
-          // Convert the raw value to a percentage (assuming 0-100%)
-          // Calibration: You may need to determine the min (dry) and max (wet) raw values for your sensor
-          float min_raw = 0;   // Replace with your dry calibration value
-          float max_raw = 4095; // Replace with your wet calibration value (for ESP32 ADC resolution)
-
-          // Map the raw value to a percentage
-          float moisture_percent = map(raw_value, min_raw, max_raw, 0, 100);
-          moisture_percent = constrain(moisture_percent, 0, 100); // Ensure the value stays within 0-100%
-
-          // Print the readings to the Serial Monitor
-          Serial.print("Raw ADC Value: ");
-          Serial.print(raw_value);
-          Serial.print(" | Soil Moisture: ");
-          Serial.print(moisture_percent, 1);  // Print moisture percentage with 1 decimal place
-          Serial.println("%");
-      }
+        // Print the readings to the Serial Monitor
+        Serial.print("Raw ADC Value: ");
+        Serial.print(raw_value);
+        Serial.print(" | Soil Moisture: ");
+        Serial.print(moisture_percent, 1);  // Print moisture percentage with 1 decimal place
+        Serial.println("%");
     }
 
     // Add a small delay to reduce CPU usage
