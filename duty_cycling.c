@@ -25,6 +25,9 @@ Pranav Cherukupalli <cherukupallip@gmail.com>
 // Create sensor instances
 Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591);
 
+#define PH_SENSOR_PIN 0  // GPIO 0 connected to the sensor's analog output
+#define SOIL_MOISTURE_PIN 1  // GPIO 1 connected to the sensor's analog output
+
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  5        /* Time ESP32 will go to sleep (in seconds) */
 
@@ -92,6 +95,42 @@ void setup(){
   Serial.print(F("Visible Light: ")); Serial.print(visible);
   Serial.print(F(" | Infrared: ")); Serial.print(infrared);
   Serial.print(F(" | Lux: ")); Serial.println(lux);
+
+  // Read the raw ADC value from the pH sensor
+  int raw_ADC_value = analogRead(PH_SENSOR_PIN);
+
+  // Convert raw value to voltage (ESP32 ADC resolution is 12-bit by default)
+  float voltage = (raw_ADC_value / 4095.0) * 3.3;
+
+  // Convert the voltage to pH value using calibration
+  float pH = 3.5 * voltage;  // Adjust the multiplier and offset as needed
+
+  // Print pH readings
+  Serial.print("Raw ADC Value: ");
+  Serial.print(raw_ADC_value);
+  Serial.print(" | Voltage: ");
+  Serial.print(voltage, 2);
+  Serial.print(" V | pH: ");
+  Serial.println(pH, 2);
+
+  // Read the raw analog value from the sensor
+  int raw_value = analogRead(SOIL_MOISTURE_PIN);
+
+  // Convert the raw value to a percentage (assuming 0-100%)
+  // Calibration: You may need to determine the min (dry) and max (wet) raw values for your sensor
+  float min_raw = 0;   // Replace with your dry calibration value
+  float max_raw = 4095; // Replace with your wet calibration value (for ESP32 ADC resolution)
+
+  // Map the raw value to a percentage
+  float moisture_percent = map(raw_value, min_raw, max_raw, 0, 100);
+  moisture_percent = constrain(moisture_percent, 0, 100); // Ensure the value stays within 0-100%
+
+  // Print the readings to the Serial Monitor
+  Serial.print("Raw ADC Value: ");
+  Serial.print(raw_value);
+  Serial.print(" | Soil Moisture: ");
+  Serial.print(moisture_percent, 1);  // Print moisture percentage with 1 decimal place
+  Serial.println("%");
 
   /*
   Next we decide what all peripherals to shut down/keep on
