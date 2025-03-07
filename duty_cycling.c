@@ -129,17 +129,17 @@ void setup(){
   Serial.print(F(" | Lux: ")); Serial.println(lux);
 
   // // Read UVA, UVB, and calculate UV Index
-  // float uva = uv.readUVA();
-  // float uvb = uv.readUVB();
-  // float uvIndex = uv.readUVI();
+  float uva = uv.readUVA();
+  float uvb = uv.readUVB();
+  float uvIndex = uv.readUVI();
 
-  // // Print the readings to the Serial Monitor
-  // Serial.print("UVA: ");
-  // Serial.print(uva);
-  // Serial.print(" | UVB: ");
-  // Serial.print(uvb);
-  // Serial.print(" | UV Index: ");
-  // Serial.println(uvIndex);
+  // Print the readings to the Serial Monitor
+  Serial.print("UVA: ");
+  Serial.print(uva);
+  Serial.print(" | UVB: ");
+  Serial.print(uvb);
+  Serial.print(" | UV Index: ");
+  Serial.println(uvIndex);
 
   // Read the raw ADC value from the pH sensor
   int raw_ADC_value = analogRead(PH_SENSOR_PIN);
@@ -197,6 +197,7 @@ void setup(){
   sleep was started, it will sleep forever unless hardware
   reset occurs.
   */
+  // Serial.println("Still accepting changes");
   loop();
   Serial.println("Going to sleep now");
   delay(1000);
