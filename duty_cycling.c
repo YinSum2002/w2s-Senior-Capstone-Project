@@ -20,10 +20,14 @@ Pranav Cherukupalli <cherukupallip@gmail.com>
 */
 
 #include <Wire.h>
+#include <Adafruit_AHTX0.h>
 #include <Adafruit_TSL2591.h>
+#include <Adafruit_VEML6075.h>
 
 // Create sensor instances
+Adafruit_AHTX0 aht;
 Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591);
+Adafruit_VEML6075 uv = Adafruit_VEML6075();
 
 #define PH_SENSOR_PIN 0  // GPIO 0 connected to the sensor's analog output
 #define SOIL_MOISTURE_PIN 1  // GPIO 1 connected to the sensor's analog output
@@ -79,11 +83,39 @@ void setup(){
   " Seconds");
 
   while (!Serial);
-  
+  Wire.end();
   // Initialize I2C GPIO 8 (SCL) and GPIO 9 (SDA)
   Wire.begin(9, 8);
 
-    // Get full-spectrum (visible + IR) and IR-only light levels
+  delay(100);  // Give sensors time to wake up
+
+  // Reinitialize all sensors
+  if (!aht.begin()) {
+      Serial.println("Failed to initialize AHT20 sensor!");
+      while (1);
+  }
+
+  if (!tsl.begin()) {
+      Serial.println(F("Could not find a valid TSL2591 sensor, check wiring!"));
+      while (1);
+  }
+
+  if (!uv.begin()) {
+      Serial.println("Failed to find VEML6075 sensor. Check wiring!");
+      while (1);
+  }
+
+  Serial.println("All sensors initialized.");
+
+  // Run the AHT20
+  sensors_event_t humidity, temp;
+  aht.getEvent(&humidity, &temp);
+
+  // Print AHT20 readings
+  Serial.print("Temp: "); Serial.print(temp.temperature); Serial.println(" °C");
+  Serial.print("Humidity: "); Serial.print(humidity.relative_humidity); Serial.println(" %");
+
+  // Get full-spectrum (visible + IR) and IR-only light levels
   uint32_t full = tsl.getFullLuminosity();
   uint16_t visible = full & 0xFFFF;
   uint16_t infrared = full >> 16;
@@ -95,6 +127,19 @@ void setup(){
   Serial.print(F("Visible Light: ")); Serial.print(visible);
   Serial.print(F(" | Infrared: ")); Serial.print(infrared);
   Serial.print(F(" | Lux: ")); Serial.println(lux);
+
+  // // Read UVA, UVB, and calculate UV Index
+  // float uva = uv.readUVA();
+  // float uvb = uv.readUVB();
+  // float uvIndex = uv.readUVI();
+
+  // // Print the readings to the Serial Monitor
+  // Serial.print("UVA: ");
+  // Serial.print(uva);
+  // Serial.print(" | UVB: ");
+  // Serial.print(uvb);
+  // Serial.print(" | UV Index: ");
+  // Serial.println(uvIndex);
 
   // Read the raw ADC value from the pH sensor
   int raw_ADC_value = analogRead(PH_SENSOR_PIN);
@@ -152,6 +197,7 @@ void setup(){
   sleep was started, it will sleep forever unless hardware
   reset occurs.
   */
+  loop();
   Serial.println("Going to sleep now");
   delay(1000);
   Serial.flush(); 
@@ -161,4 +207,5 @@ void setup(){
 
 void loop(){
   //This is not going to be called
+  Serial.println("We are in the loop");
 }
