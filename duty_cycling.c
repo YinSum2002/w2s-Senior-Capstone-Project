@@ -29,13 +29,28 @@ Adafruit_AHTX0 aht;
 Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591);
 Adafruit_VEML6075 uv = Adafruit_VEML6075();
 
+RTC_DATA_ATTR int loopCounter = 0;
+
 #define PH_SENSOR_PIN 0  // GPIO 0 connected to the sensor's analog output
 #define SOIL_MOISTURE_PIN 1  // GPIO 1 connected to the sensor's analog output
 
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  5        /* Time ESP32 will go to sleep (in seconds) */
+#define MAX_ARRAY 300
 
 RTC_DATA_ATTR int bootCount = 0;
+
+RTC_DATA_ATTR struct sensorData {
+    char label[6];
+    float values[MAX_ARRAY];
+} sensors[6] = {
+    {"TEMP", {0}},  // Temperature values
+    {"HUMID", {0}}, // Humidity values
+    {"LUX", {0}},   // Light values
+    {"SOIL", {0}},  // Soil moisture values
+    {"UV", {0}},    // UV index values
+    {"PH", {0}}     // pH values
+};
 
 void configureSensor() {
   // Set gain and integration time for the TSL2591
@@ -61,6 +76,27 @@ void print_wakeup_reason(){
     case ESP_SLEEP_WAKEUP_ULP : Serial.println("Wakeup caused by ULP program"); break;
     default : Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
   }
+}
+
+void printSensorData() {
+    Serial.println("Stored Sensor Data:");
+
+    for (int i = 0; i < 6; i++) {  // Loop through the 6 sensors
+        Serial.print(sensors[i].label);
+        Serial.print(": [");
+
+        for (int j = 0; j < loopCounter; j++) {  // Loop through float values
+            if (sensors[i].values[j] != 0.0){
+              Serial.print(sensors[i].values[j], 2); // Print 2 decimal places
+
+              if (j < loopCounter - 1) {
+                  Serial.print(", ");  // Add a comma between values
+              }
+            }
+            
+        }
+        Serial.println("]");  // Close the array
+    }
 }
 
 void setup(){
@@ -107,75 +143,94 @@ void setup(){
 
   Serial.println("All sensors initialized.");
 
-  // Run the AHT20
-  sensors_event_t humidity, temp;
-  aht.getEvent(&humidity, &temp);
+  loopCounter++;
 
-  // Print AHT20 readings
-  Serial.print("Temp: "); Serial.print(temp.temperature); Serial.println(" °C");
-  Serial.print("Humidity: "); Serial.print(humidity.relative_humidity); Serial.println(" %");
+  if (loopCounter % 1 == 0){
+    // Run the AHT20
+    sensors_event_t humidity, temp;
+    aht.getEvent(&humidity, &temp);
 
-  // Get full-spectrum (visible + IR) and IR-only light levels
-  uint32_t full = tsl.getFullLuminosity();
-  uint16_t visible = full & 0xFFFF;
-  uint16_t infrared = full >> 16;
+    sensors[0].values[loopCounter/1] = temp.temperature;
+    sensors[1].values[loopCounter/1] = humidity.relative_humidity;
 
-  // Calculate Lux from the sensor readings
-  float lux = tsl.calculateLux(visible, infrared);
+    // Print AHT20 readings
+    Serial.print("Temp: "); Serial.print(temp.temperature); Serial.println(" °C");
+    Serial.print("Humidity: "); Serial.print(humidity.relative_humidity); Serial.println(" %");
+  }
 
-  // Print TSL2591 readings
-  Serial.print(F("Visible Light: ")); Serial.print(visible);
-  Serial.print(F(" | Infrared: ")); Serial.print(infrared);
-  Serial.print(F(" | Lux: ")); Serial.println(lux);
+  if (loopCounter % 2 == 0){
+    // Read the raw analog value from the sensor
+    int raw_value = analogRead(SOIL_MOISTURE_PIN);
 
-  // // Read UVA, UVB, and calculate UV Index
-  float uva = uv.readUVA();
-  float uvb = uv.readUVB();
-  float uvIndex = uv.readUVI();
+    // Convert the raw value to a percentage (assuming 0-100%)
+    // Calibration: You may need to determine the min (dry) and max (wet) raw values for your sensor
+    float min_raw = 0;   // Replace with your dry calibration value
+    float max_raw = 4095; // Replace with your wet calibration value (for ESP32 ADC resolution)
 
-  // Print the readings to the Serial Monitor
-  Serial.print("UVA: ");
-  Serial.print(uva);
-  Serial.print(" | UVB: ");
-  Serial.print(uvb);
-  Serial.print(" | UV Index: ");
-  Serial.println(uvIndex);
+    // Map the raw value to a percentage
+    float moisture_percent = map(raw_value, min_raw, max_raw, 0, 100);
+    moisture_percent = constrain(moisture_percent, 0, 100); // Ensure the value stays within 0-100%
 
-  // Read the raw ADC value from the pH sensor
-  int raw_ADC_value = analogRead(PH_SENSOR_PIN);
+    sensors[3].values[loopCounter/2] = moisture_percent;
 
-  // Convert raw value to voltage (ESP32 ADC resolution is 12-bit by default)
-  float voltage = (raw_ADC_value / 4095.0) * 3.3;
+    // Print the readings to the Serial Monitor
+    Serial.print("Raw ADC Value: ");
+    Serial.print(raw_value);
+    Serial.print(" | Soil Moisture: ");
+    Serial.print(moisture_percent, 1);  // Print moisture percentage with 1 decimal place
+    Serial.println("%");
+  }
 
-  // Convert the voltage to pH value using calibration
-  float pH = 3.5 * voltage;  // Adjust the multiplier and offset as needed
+  if (loopCounter % 3 == 0){
+    // Get full-spectrum (visible + IR) and IR-only light levels
+    uint32_t full = tsl.getFullLuminosity();
+    uint16_t visible = full & 0xFFFF;
+    uint16_t infrared = full >> 16;
 
-  // Print pH readings
-  Serial.print("Raw ADC Value: ");
-  Serial.print(raw_ADC_value);
-  Serial.print(" | Voltage: ");
-  Serial.print(voltage, 2);
-  Serial.print(" V | pH: ");
-  Serial.println(pH, 2);
+    // Calculate Lux from the sensor readings
+    float lux = tsl.calculateLux(visible, infrared);
 
-  // Read the raw analog value from the sensor
-  int raw_value = analogRead(SOIL_MOISTURE_PIN);
+    sensors[2].values[loopCounter/3] = lux;
 
-  // Convert the raw value to a percentage (assuming 0-100%)
-  // Calibration: You may need to determine the min (dry) and max (wet) raw values for your sensor
-  float min_raw = 0;   // Replace with your dry calibration value
-  float max_raw = 4095; // Replace with your wet calibration value (for ESP32 ADC resolution)
+    // Print TSL2591 readings
+    Serial.print(F("Visible Light: ")); Serial.print(visible);
+    Serial.print(F(" | Infrared: ")); Serial.print(infrared);
+    Serial.print(F(" | Lux: ")); Serial.println(lux);
 
-  // Map the raw value to a percentage
-  float moisture_percent = map(raw_value, min_raw, max_raw, 0, 100);
-  moisture_percent = constrain(moisture_percent, 0, 100); // Ensure the value stays within 0-100%
+    // // Read UVA, UVB, and calculate UV Index
+    float uva = uv.readUVA();
+    float uvb = uv.readUVB();
+    float uvIndex = uv.readUVI();
 
-  // Print the readings to the Serial Monitor
-  Serial.print("Raw ADC Value: ");
-  Serial.print(raw_value);
-  Serial.print(" | Soil Moisture: ");
-  Serial.print(moisture_percent, 1);  // Print moisture percentage with 1 decimal place
-  Serial.println("%");
+    sensors[4].values[loopCounter/3] = uva;
+
+    // Print the readings to the Serial Monitor
+    Serial.print("UVA: ");
+    Serial.print(uva);
+    Serial.print(" | UVB: ");
+    Serial.print(uvb);
+    Serial.print(" | UV Index: ");
+    Serial.println(uvIndex);
+
+    // Read the raw ADC value from the pH sensor
+    int raw_ADC_value = analogRead(PH_SENSOR_PIN);
+
+    // Convert raw value to voltage (ESP32 ADC resolution is 12-bit by default)
+    float voltage = (raw_ADC_value / 4095.0) * 3.3;
+
+    // Convert the voltage to pH value using calibration
+    float pH = 3.5 * voltage;  // Adjust the multiplier and offset as needed
+
+    sensors[5].values[loopCounter/3] = pH;
+
+    // Print pH readings
+    Serial.print("Raw ADC Value: ");
+    Serial.print(raw_ADC_value);
+    Serial.print(" | Voltage: ");
+    Serial.print(voltage, 2);
+    Serial.print(" V | pH: ");
+    Serial.println(pH, 2);
+  }
 
   /*
   Next we decide what all peripherals to shut down/keep on
@@ -198,7 +253,9 @@ void setup(){
   reset occurs.
   */
   // Serial.println("Still accepting changes");
-  loop();
+  if (loopCounter % 5 == 0){
+    loop();
+  }
   Serial.println("Going to sleep now");
   delay(1000);
   Serial.flush(); 
@@ -209,4 +266,7 @@ void setup(){
 void loop(){
   //This is not going to be called
   Serial.println("We are in the loop");
+
+  printSensorData();
+  return;
 }
