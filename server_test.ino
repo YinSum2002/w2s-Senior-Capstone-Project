@@ -5,6 +5,8 @@
 #define SERVICE_UUID "12345678-1234-5678-1234-56789abcdef0"
 #define CHARACTERISTIC_UUID "abcd1234-5678-1234-5678-abcdef123456"
 
+#define VALUE_COUNT 10
+
 // Define deep sleep options
 //uint64_t uS_TO_S_FACTOR = 1000000;  // Conversion factor for micro seconds to seconds
 // Sleep for 1 minute = 60 seconds
@@ -16,13 +18,16 @@ bool deviceConnected = false;
 bool dataSent = false;
 
 // Dictionary of sensor data
-std::map<std::string, std::vector<float>> sensorData = {
-    {"TEMP", {}},
-    {"SOIL", {}},
-    {"LUX", {}},
-    {"UV", {}},
-    {"PH", {}},
-    {"HUMIDITY", {}}
+struct SensorData {
+    char label[6];
+    float values[VALUE_COUNT];
+} sensors[6] = {
+    {"TEMP", {0}},  // Temperature values
+    {"HUMID", {0}}, // Humidity values
+    {"LUX", {0}},   // Light values
+    {"SOIL", {0}},  // Soil moisture values
+    {"UV", {0}},    // UV index values
+    {"PH", {0}}     // pH values
 };
 
 class MyServerCallbacks : public BLEServerCallbacks {
@@ -39,25 +44,24 @@ class MyServerCallbacks : public BLEServerCallbacks {
 
 // Function to generate sensor data
 void generateSensorData() {
-    sensorData["TEMP"].clear();
-    sensorData["SOIL"].clear();
-    sensorData["UV"].clear();
-    sensorData["LUX"].clear();
-    sensorData["PH"].clear();
-    sensorData["HUMIDITY"].clear();
+  for (int i = 0; i < 6; i++) {
+    for (int j = 0; j < VALUE_COUNT; j++) {
+        sensors[i].values[j] = 0.0;  // Reset all sensor values to 0.0
+    }
+  }
 
-    for (int i = 0; i < 10; i++) {
-        sensorData["TEMP"].push_back(random(9500, 10500) / 100.0); // 95.00 - 105.00
-    }
-    for (int i = 0; i < 2; i++) {
-        sensorData["PH"].push_back(random(600, 800) / 100.0); // 6.00 - 8.00
-        sensorData["UV"].push_back(random(6000, 8000));
-    }
-    for (int i = 0; i < 5; i++) {
-        sensorData["HUMIDITY"].push_back(random(3000, 7000) / 100.0); // 30.00 - 70.00
-        sensorData["SOIL"].push_back(random(318, 791));
-        sensorData["HUMIDITY"].push_back(random(10, 100) / 100.0);
-    }
+  for (int i = 0; i < 10; i++) {
+      sensors[0].values[i] = random(9500, 10500) / 100.0; // 95.00 - 105.00
+  }
+  for (int i = 0; i < 2; i++) {
+      sensors[5].values[i] = random(600, 800) / 100.0;
+      sensors[4].values[i] = random(6000, 8000);
+  }
+  for (int i = 0; i < 5; i++) {
+      sensors[2].values[i] = random(3000, 7000) / 10; // 95.00 - 105.00
+      sensors[3].values[i] = random(318, 791); // 95.00 - 105.00
+      sensors[1].values[i] = random(10, 100) / 100.0; // 95.00 - 105.00
+  }
 }
 
 void setup() {
@@ -87,26 +91,23 @@ void setup() {
 
 void loop() {
     if (deviceConnected && !dataSent) {
-        // Iterate through dictionary keys
-        for (auto& pair : sensorData) {
-            std::string label = pair.first;  // "TEMP", "PH", "HUMIDITY", etc.
-            for (float value : pair.second) {
-                String message = String(label.c_str()) + ":" + String(value, 2);
-                pCharacteristic->setValue(message.c_str());
-                pCharacteristic->notify();
-                Serial.println("Sent: " + message);
-                delay(2000); // Ensures reliable transmission
+        // Iterate through the sensor struct array
+        for (int i = 0; i < 6; i++) {  // Loop through each sensor type
+            for (int j = 0; j <= VALUE_COUNT; j++) {  // Loop through stored values
+                if (sensors[i].values[j] != 0.0) {  // Skip zero values
+                    String message = String(sensors[i].label) + ":" + String(sensors[i].values[j], 2);
+                    pCharacteristic->setValue(message.c_str());
+                    pCharacteristic->notify();
+                    Serial.println("Sent: " + message);
+                    delay(2000);  // Ensures reliable transmission
+                }
             }
         }
 
         dataSent = true;
         Serial.println("All data sent. Disconnecting...");
-        pServer->disconnect(0); // Force disconnect
-    }
-
-    if (!deviceConnected && dataSent) {
-        Serial.println("Going to deep sleep to save battery...");
-        //esp_deep_sleep_start(); // Put ESP32 in deep sleep
+        pServer->disconnect(0);  // Force disconnect
+        return;
     }
 }
 
