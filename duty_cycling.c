@@ -23,6 +23,9 @@ Pranav Cherukupalli <cherukupallip@gmail.com>
 #include <Adafruit_AHTX0.h>
 #include <Adafruit_TSL2591.h>
 #include <Adafruit_VEML6075.h>
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
 
 // Create sensor instances
 Adafruit_AHTX0 aht;
@@ -31,12 +34,20 @@ Adafruit_VEML6075 uv = Adafruit_VEML6075();
 
 RTC_DATA_ATTR int loopCounter = 0;
 
+#define SERVICE_UUID "12345678-1234-5678-1234-56789abcdef0"
+#define CHARACTERISTIC_UUID "abcd1234-5678-1234-5678-abcdef123456"
+
 #define PH_SENSOR_PIN 0  // GPIO 0 connected to the sensor's analog output
 #define SOIL_MOISTURE_PIN 1  // GPIO 1 connected to the sensor's analog output
 
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  5        /* Time ESP32 will go to sleep (in seconds) */
 #define MAX_ARRAY 300
+
+BLEServer* pServer = NULL;
+BLECharacteristic* pCharacteristic = NULL;
+bool deviceConnected = false;
+bool dataSent = false;
 
 RTC_DATA_ATTR int bootCount = 0;
 
@@ -50,6 +61,19 @@ RTC_DATA_ATTR struct sensorData {
     {"SOIL", {0}},  // Soil moisture values
     {"UV", {0}},    // UV index values
     {"PH", {0}}     // pH values
+};
+
+class MyServerCallbacks : public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer) {
+        deviceConnected = true;
+        Serial.println("deviceConnected was just set to true");
+        dataSent = false;
+    }
+    void onDisconnect(BLEServer* pServer) {
+        deviceConnected = false;
+        Serial.println("Client Disconnected. Stopping BLE Advertising...");
+        BLEDevice::getAdvertising()->stop();
+    }
 };
 
 void configureSensor() {
@@ -101,6 +125,7 @@ void printSensorData() {
 
 void setup(){
   Serial.begin(115200);
+  
   delay(1000); //Take some time to open up the Serial Monitor
 
   //Increment boot number and print it every reboot
@@ -109,6 +134,24 @@ void setup(){
 
   //Print the wakeup reason for ESP32
   print_wakeup_reason();
+
+  BLEDevice::init("RFID #12345");
+  pServer = BLEDevice::createServer();
+  Serial.println("About to call MyServerCallbacks");
+  pServer->setCallbacks(new MyServerCallbacks());
+  Serial.println("Just called MyServerCallbacks");
+
+  BLEService* pService = pServer->createService(SERVICE_UUID);
+  pCharacteristic = pService->createCharacteristic(
+                      CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_READ |
+                      BLECharacteristic::PROPERTY_NOTIFY
+                  );
+
+  pService->start();
+  BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pServer->getAdvertising()->start();
 
   /*
   First we configure the wake up source
@@ -253,11 +296,13 @@ void setup(){
   reset occurs.
   */
   // Serial.println("Still accepting changes");
+
   if (loopCounter % 5 == 0){
+    
     loop();
   }
   Serial.println("Going to sleep now");
-  delay(1000);
+  delay(5000);
   Serial.flush(); 
   esp_deep_sleep_start();
   Serial.println("This will never be printed");
@@ -268,5 +313,34 @@ void loop(){
   Serial.println("We are in the loop");
 
   printSensorData();
-  return;
+
+  if (deviceConnected){
+    Serial.println("deviceConnected");
+  }
+  if (!dataSent){
+    Serial.println("!dataSent");
+  }
+  if (deviceConnected && !dataSent) {
+    Serial.println("Waiting for BLE to be ready...");
+    delay(2000);  // Give BLE some time before sending
+    for (int i = 0; i < 6; i++) {  // Loop through each sensor type
+        Serial.println("Entered loop of 6");
+        for (int j = 0; j <= loopCounter; j++) {  // Loop through stored values
+            Serial.println("Entered loop of loopCounter");
+            if (sensors[i].values[j] != 0.0) {  // Skip zero values
+                Serial.println("sensors[i].values[j] != 0.0");
+                String message = String(sensors[i].label) + ":" + String(sensors[i].values[j], 2);
+                pCharacteristic->setValue(message.c_str());
+                pCharacteristic->notify();
+                Serial.println("Sent: " + message);
+                delay(2000);  // Ensures reliable transmission
+            }
+        }
+    }
+
+    dataSent = true;
+    Serial.println("All data sent. Disconnecting...");
+    pServer->disconnect(0);  // Force disconnect
+    return;
+  }
 }
