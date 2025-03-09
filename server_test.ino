@@ -4,8 +4,11 @@
 
 #define SERVICE_UUID "12345678-1234-5678-1234-56789abcdef0"
 #define CHARACTERISTIC_UUID "abcd1234-5678-1234-5678-abcdef123456"
+// WIFI MAC: 1c:69:20:84:24:34 (unique to board)
+// BLE MAC: 1c:69:20:84:24:36 (unique to board)
 
 #define VALUE_COUNT 10
+#define rfid 12345
 
 // Define deep sleep options
 //uint64_t uS_TO_S_FACTOR = 1000000;  // Conversion factor for micro seconds to seconds
@@ -34,6 +37,7 @@ class MyServerCallbacks : public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
         deviceConnected = true;
         dataSent = false;
+        Serial.println("Client Connected. Waiting before sending data...");
     }
     void onDisconnect(BLEServer* pServer) {
         deviceConnected = false;
@@ -66,9 +70,16 @@ void generateSensorData() {
 
 void setup() {
     Serial.begin(115200);
-    BLEDevice::init("RFID #12345");
+    BLEDevice::init("ESP32 Server #1");
 
     pServer = BLEDevice::createServer();
+    pServer->getAdvertising()->setMinPreferred(0x06);  // 7.5ms interval
+    pServer->getAdvertising()->setMinPreferred(0x12);  // 15ms interval
+
+    // Increase supervision timeout (higher value = less chance of disconnects)
+    pServer->getAdvertising()->setMaxInterval(400);  // 250ms
+    pServer->getAdvertising()->setMinInterval(200);  // 125ms
+
     pServer->setCallbacks(new MyServerCallbacks());
 
     BLEService* pService = pServer->createService(SERVICE_UUID);
@@ -91,23 +102,23 @@ void setup() {
 
 void loop() {
     if (deviceConnected && !dataSent) {
-        // Iterate through the sensor struct array
-        for (int i = 0; i < 6; i++) {  // Loop through each sensor type
-            for (int j = 0; j <= VALUE_COUNT; j++) {  // Loop through stored values
-                if (sensors[i].values[j] != 0.0) {  // Skip zero values
-                    String message = String(sensors[i].label) + ":" + String(sensors[i].values[j], 2);
-                    pCharacteristic->setValue(message.c_str());
-                    pCharacteristic->notify();
-                    Serial.println("Sent: " + message);
-                    delay(2000);  // Ensures reliable transmission
-                }
-            }
-        }
+      // Iterate through the sensor struct array
+      for (int i = 0; i < 6; i++) {  // Loop through each sensor type
+          for (int j = 0; j < VALUE_COUNT; j++) {  // Loop through stored values
+              if (sensors[i].values[j] != 0.0) {  // Skip zero values
+                  String message = String(sensors[i].label) + ": " + String(sensors[i].values[j], 2) + " (#" + String(rfid) + ")";
+                  pCharacteristic->setValue(message.c_str());
+                  pCharacteristic->notify();
+                  Serial.println("Sent: " + message);
+                  delay(5000);  // Ensures reliable transmission
+              }
+          }
+      }
 
-        dataSent = true;
-        Serial.println("All data sent. Disconnecting...");
-        pServer->disconnect(0);  // Force disconnect
-        return;
+      dataSent = true;
+      Serial.println("All data sent. Disconnecting...");
+      pServer->disconnect(0);  // Force disconnect
+      return;
     }
 }
 
