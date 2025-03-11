@@ -1,24 +1,3 @@
-/*
-Simple Deep Sleep with Timer Wake Up
-=====================================
-ESP32 offers a deep sleep mode for effective power
-saving as power is an important factor for IoT
-applications. In this mode CPUs, most of the RAM,
-and all the digital peripherals which are clocked
-from APB_CLK are powered off. The only parts of
-the chip which can still be powered on are:
-RTC controller, RTC peripherals ,and RTC memories
-
-This code displays the most basic deep sleep with
-a timer to wake it up and how to store data in
-RTC memory to use it over reboots
-
-This code is under Public Domain License.
-
-Author:
-Pranav Cherukupalli <cherukupallip@gmail.com>
-*/
-
 #include <Wire.h>
 #include <Adafruit_AHTX0.h>
 #include <Adafruit_TSL2591.h>
@@ -50,6 +29,7 @@ BLEServer* pServer = NULL;
 BLECharacteristic* pCharacteristic = NULL;
 bool deviceConnected = false;
 bool dataSent = false;
+bool BLE_setup = false;
 
 RTC_DATA_ATTR int bootCount = 0;
 
@@ -74,7 +54,7 @@ class MyServerCallbacks : public BLEServerCallbacks {
     void onDisconnect(BLEServer* pServer) {
         deviceConnected = false;
         Serial.println("Client Disconnected. Stopping BLE Advertising...");
-        BLEDevice::getAdvertising()->stop();
+        BLEDevice::startAdvertising();
     }
 };
 
@@ -137,6 +117,7 @@ void setup(){
   //Print the wakeup reason for ESP32
   print_wakeup_reason();
 
+/*
   BLEDevice::init("RFID #12345");
   pServer = BLEDevice::createServer();
   Serial.println("About to call MyServerCallbacks");
@@ -153,7 +134,7 @@ void setup(){
   pService->start();
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
-  pServer->getAdvertising()->start();
+  pServer->getAdvertising()->start(); */
 
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
   Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) +
@@ -273,28 +254,6 @@ void setup(){
     Serial.println(pH, 2);
   }
 
-  /*
-  Next we decide what all peripherals to shut down/keep on
-  By default, ESP32 will automatically power down the peripherals
-  not needed by the wakeup source, but if you want to be a poweruser
-  this is for you. Read in detail at the API docs
-  http://esp-idf.readthedocs.io/en/latest/api-reference/system/deep_sleep.html
-  Left the line commented as an example of how to configure peripherals.
-  The line below turns off all RTC peripherals in deep sleep.
-  */
-  //esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
-  //Serial.println("Configured all RTC Peripherals to be powered down in sleep");
-
-  /*
-  Now that we have setup a wake cause and if needed setup the
-  peripherals state in deep sleep, we can now start going to
-  deep sleep.
-  In the case that no wake up sources were provided but deep
-  sleep was started, it will sleep forever unless hardware
-  reset occurs.
-  */
-  // Serial.println("Still accepting changes");
-
   if (loopCounter % 5 == 0){
     loop();
   }
@@ -315,6 +274,27 @@ void loop(){
   //This is not going to be called
   Serial.println("We are in the loop");
 
+  if (!BLE_setup) {
+    BLEDevice::init("RFID #12345");
+    pServer = BLEDevice::createServer();
+    Serial.println("About to call MyServerCallbacks");
+    pServer->setCallbacks(new MyServerCallbacks());
+    Serial.println("Just called MyServerCallbacks");
+
+    BLEService* pService = pServer->createService(SERVICE_UUID);
+    pCharacteristic = pService->createCharacteristic(
+                        CHARACTERISTIC_UUID,
+                        BLECharacteristic::PROPERTY_READ |
+                        BLECharacteristic::PROPERTY_NOTIFY
+                    );
+
+    pService->start();
+    BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(SERVICE_UUID);
+    pServer->getAdvertising()->start();
+    BLE_setup = true;
+  }
+
   printSensorData();
 
   Serial.println("deviceConnected: " + String(deviceConnected));
@@ -328,8 +308,8 @@ void loop(){
   }
 
   while (!deviceConnected) {
-        delay(100);  // Small delay to avoid CPU overuse
-    }
+    delay(100);  // Small delay to avoid CPU overuse
+  }
 
   Serial.println("BLE device connected! Sending data...");
 
@@ -344,11 +324,13 @@ void loop(){
                     pCharacteristic->notify();
                     Serial.println("Sent: " + message);
                     delay(2500);  // Ensures reliable transmission
+                    sensors[i].values[j] = 0.0;
                 }
             }
         }
       dataSent = true;
       Serial.println("All data sent. Disconnecting...");
+      BLE_setup = false;
       pServer->disconnect(0);  // Force disconnect
       return;
   }
