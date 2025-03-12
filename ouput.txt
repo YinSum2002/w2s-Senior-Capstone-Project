@@ -1,0 +1,129 @@
+ESP Woke Up at: 1007 ms
+Boot number: 1
+Wakeup was not caused by deep sleep: 0
+About to call MyServerCallbacks
+Just called MyServerCallbacks
+Setup ESP32 to sleep for every 5 Seconds
+All sensors initialized.
+Temp: 24.90 °C
+Humidity: 14.09 %
+ESP Going to Sleep at: 1462 ms
+Time Awake: 455 ms
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x5 (DSLEEP),boot:0xc (SPI_FAST_FLASH_BOOT)
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fcd5820,len:0x1144
+load:0x403cc710,len:0xad8
+load:0x403ce710,len:0x2f80
+entry 0x403cc710
+ESP Woke Up at: 1007 ms
+Boot number: 2
+Wakeup caused by timer
+About to call MyServerCallbacks
+Just called MyServerCallbacks
+Setup ESP32 to sleep for every 5 Seconds
+All sensors initialized.
+Temp: 24.91 °C
+Humidity: 13.99 %
+Raw ADC Value: 3552 | Soil Moisture: 86.0%
+ESP Going to Sleep at: 1446 ms
+Time Awake: 439 ms
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x5 (DSLEEP),boot:0xc (SPI_FAST_FLASH_BOOT)
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fcd5820,len:0x1144
+load:0x403cc710,len:0xad8
+load:0x403ce710,len:0x2f80
+entry 0x403cc710
+ESP Woke Up at: 1007 ms
+Boot number: 3
+Wakeup caused by timer
+About to call MyServerCallbacks
+Just called MyServerCallbacks
+Setup ESP32 to sleep for every 5 Seconds
+All sensors initialized.
+Temp: 24.92 °C
+Humidity: 13.87 %
+Visible Light: 913 | Infrared: 146 | Lux: 105.16
+UVA: -9.09 | UVB: -10.97 | UV Index: -0.02
+Raw ADC Value: 1866 | Voltage: 1.50 V | pH: 5.26
+ESP Going to Sleep at: 1575 ms
+Time Awake: 568 ms
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x5 (DSLEEP),boot:0xc (SPI_FAST_FLASH_BOOT)
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fcd5820,len:0x1144
+load:0x403cc710,len:0xad8
+load:0x403ce710,len:0x2f80
+entry 0x403cc710
+ESP Woke Up at: 1007 ms
+Boot number: 4
+Wakeup caused by timer
+About to call MyServerCallbacks
+Just called MyServerCallbacks
+Setup ESP32 to sleep for every 5 Seconds
+All sensors initialized.
+Temp: 24.91 °C
+Humidity: 13.77 %
+Raw ADC Value: 3578 | Soil Moisture: 87.0%
+ESP Going to Sleep at: 1446 ms
+Time Awake: 439 ms
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x5 (DSLEEP),boot:0xc (SPI_FAST_FLASH_BOOT)
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fcd5820,len:0x1144
+load:0x403cc710,len:0xad8
+load:0x403ce710,len:0x2f80
+entry 0x403cc710
+ESP Woke Up at: 1007 ms
+Boot number: 5
+Wakeup caused by timer
+About to call MyServerCallbacks
+Just called MyServerCallbacks
+Setup ESP32 to sleep for every 5 Seconds
+All sensors initialized.
+Temp: 24.90 °C
+Humidity: 13.87 %
+ESP Going to Sleep at: 1445 ms
+Time Awake: 438 ms
+ESP-ROM:esp32c3-api1-20210207
+Build:Feb  7 2021
+rst:0x5 (DSLEEP),boot:0xc (SPI_FAST_FLASH_BOOT)
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fcd5820,len:0x1144
+load:0x403cc710,len:0xad8
+load:0x403ce710,len:0x2f80
+entry 0x403cc710
+ESP Woke Up at: 1007 ms
+Boot number: 6
+Wakeup caused by timer
+About to call MyServerCallbacks
+Just called MyServerCallbacks
+Setup ESP32 to sleep for every 5 Seconds
+All sensors initialized.
+Temp: 24.91 °C
+Humidity: 13.86 %
+Raw ADC Value: 3565 | Soil Moisture: 87.0%
+Visible Light: 921 | Infrared: 147 | Lux: 106.16
+UVA: -7.10 | UVB: -3.38 | UV Index: -0.01
+Raw ADC Value: 1870 | Voltage: 1.51 V | pH: 5.27
+We are in the loop
+Stored Sensor Data:
+TEMP: [24.90, 24.91, 24.92, 24.91, 24.90]
+HUMID: [14.09, 13.99, 13.87, 13.77, 13.87]
+LUX: [105.16, 106.16, ]
+SOIL: [86.00, 87.00, 87.00, ]
+UV: [-9.09, -7.10, ]
+PH: [5.26, 5.27, ]
+!dataSent
+ESP Going to Sleep at: 1596 ms
+Time Awake: 589 ms
