@@ -34,6 +34,10 @@ Adafruit_VEML6075 uv = Adafruit_VEML6075();
 
 RTC_DATA_ATTR int loopCounter = 0;
 
+RTC_DATA_ATTR unsigned long wakeupTime = 0;
+RTC_DATA_ATTR unsigned long sleepTime = 0;
+RTC_DATA_ATTR unsigned long awakeDuration = 0;
+
 #define SERVICE_UUID "12345678-1234-5678-1234-56789abcdef0"
 #define CHARACTERISTIC_UUID "abcd1234-5678-1234-5678-abcdef123456"
 
@@ -66,6 +70,7 @@ RTC_DATA_ATTR struct sensorData {
 class MyServerCallbacks : public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
         deviceConnected = true;
+        Serial.println("deviceConnected was just set to true");
         dataSent = false;
     }
     void onDisconnect(BLEServer* pServer) {
@@ -122,10 +127,25 @@ void printSensorData() {
     }
 }
 
+void prepareForDeepSleep() {
+  sleepTime = millis();  // Record sleep time
+  awakeDuration = sleepTime - wakeupTime;  // Calculate time spent awake
+
+  Serial.println("ESP Going to Sleep at: " + String(sleepTime) + " ms");
+  Serial.println("Time Awake: " + String(awakeDuration) + " ms");
+
+  delay(1000);
+  Serial.flush(); 
+  esp_deep_sleep_start();
+}
+
 void setup(){
   Serial.begin(115200);
   
   delay(1000); //Take some time to open up the Serial Monitor
+
+  wakeupTime = millis();  // Record when ESP wakes up
+  Serial.println("ESP Woke Up at: " + String(wakeupTime) + " ms");
 
   //Increment boot number and print it every reboot
   ++bootCount;
@@ -133,6 +153,24 @@ void setup(){
 
   //Print the wakeup reason for ESP32
   print_wakeup_reason();
+
+  BLEDevice::init("RFID #12345");
+  pServer = BLEDevice::createServer();
+  Serial.println("About to call MyServerCallbacks");
+  pServer->setCallbacks(new MyServerCallbacks());
+  Serial.println("Just called MyServerCallbacks");
+
+  BLEService* pService = pServer->createService(SERVICE_UUID);
+  pCharacteristic = pService->createCharacteristic(
+                      CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_READ |
+                      BLECharacteristic::PROPERTY_NOTIFY
+                  );
+
+  pService->start();
+  BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pServer->getAdvertising()->start();
 
   /*
   First we configure the wake up source
@@ -277,29 +315,13 @@ void setup(){
   reset occurs.
   */
   // Serial.println("Still accepting changes");
-  if (loopCounter % 5 == 0){
-    BLEDevice::init("RFID #12345");
 
-    pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new MyServerCallbacks());
-
-    BLEService* pService = pServer->createService(SERVICE_UUID);
-    pCharacteristic = pService->createCharacteristic(
-                        CHARACTERISTIC_UUID,
-                        BLECharacteristic::PROPERTY_READ |
-                        BLECharacteristic::PROPERTY_NOTIFY
-                    );
-
-    pService->start();
-    BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
-    pAdvertising->addServiceUUID(SERVICE_UUID);
-    pServer->getAdvertising()->start();
+  if (loopCounter % 6 == 0){
+    
     loop();
   }
-  Serial.println("Going to sleep now");
-  delay(1000);
-  Serial.flush(); 
-  esp_deep_sleep_start();
+  prepareForDeepSleep();
+
   Serial.println("This will never be printed");
 }
 
@@ -308,11 +330,22 @@ void loop(){
   Serial.println("We are in the loop");
 
   printSensorData();
+
+  if (deviceConnected){
+    Serial.println("deviceConnected");
+  }
+  if (!dataSent){
+    Serial.println("!dataSent");
+  }
   if (deviceConnected && !dataSent) {
-    // Iterate through the sensor struct array
+    Serial.println("Waiting for BLE to be ready...");
+    delay(2000);  // Give BLE some time before sending
     for (int i = 0; i < 6; i++) {  // Loop through each sensor type
+        Serial.println("Entered loop of 6");
         for (int j = 0; j <= loopCounter; j++) {  // Loop through stored values
+            Serial.println("Entered loop of loopCounter");
             if (sensors[i].values[j] != 0.0) {  // Skip zero values
+                Serial.println("sensors[i].values[j] != 0.0");
                 String message = String(sensors[i].label) + ":" + String(sensors[i].values[j], 2);
                 pCharacteristic->setValue(message.c_str());
                 pCharacteristic->notify();
