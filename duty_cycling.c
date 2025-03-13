@@ -44,8 +44,11 @@ RTC_DATA_ATTR unsigned long awakeDuration = 0;
 #define PH_SENSOR_PIN 0  // GPIO 0 connected to the sensor's analog output
 #define SOIL_MOISTURE_PIN 1  // GPIO 1 connected to the sensor's analog output
 
+#define LED_DUTY_CYCLE 18  // LED indicating ESP is awake (duty cycling)
+#define LED_SLEEP 19        // LED indicating ESP is in deep sleep
+
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  5        /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP  20        /* Time ESP32 will go to sleep (in seconds) */
 #define MAX_ARRAY 300
 
 BLEServer* pServer = NULL;
@@ -54,6 +57,8 @@ bool deviceConnected = false;
 bool dataSent = false;
 
 RTC_DATA_ATTR int bootCount = 0;
+
+RTC_DATA_ATTR bool isSleeping = false;  // RTC variable to track sleep state
 
 RTC_DATA_ATTR struct sensorData {
     char label[6];
@@ -76,7 +81,7 @@ class MyServerCallbacks : public BLEServerCallbacks {
     void onDisconnect(BLEServer* pServer) {
         deviceConnected = false;
         Serial.println("Client Disconnected. Stopping BLE Advertising...");
-        BLEDevice::getAdvertising()->stop();
+        BLEDevice::startAdvertising();
     }
 };
 
@@ -141,11 +146,24 @@ void prepareForDeepSleep() {
 
 void setup(){
   Serial.begin(115200);
-  
+
+  pinMode(LED_DUTY_CYCLE, OUTPUT);
+  pinMode(LED_SLEEP, OUTPUT);
+
   delay(1000); //Take some time to open up the Serial Monitor
 
   wakeupTime = millis();  // Record when ESP wakes up
   Serial.println("ESP Woke Up at: " + String(wakeupTime) + " ms");
+
+  // If waking from deep sleep, blink the sleep LED
+  if (isSleeping) {
+      for (int i = 0; i < 5; i++) {  // Blink LED2 (Sleep Indicator)
+          digitalWrite(LED_SLEEP, HIGH);
+          delay(500);
+          digitalWrite(LED_SLEEP, LOW);
+          delay(500);
+      }
+  }
 
   //Increment boot number and print it every reboot
   ++bootCount;
@@ -154,23 +172,23 @@ void setup(){
   //Print the wakeup reason for ESP32
   print_wakeup_reason();
 
-  BLEDevice::init("RFID #12345");
-  pServer = BLEDevice::createServer();
-  Serial.println("About to call MyServerCallbacks");
-  pServer->setCallbacks(new MyServerCallbacks());
-  Serial.println("Just called MyServerCallbacks");
+  // BLEDevice::init("RFID #12345");
+  // pServer = BLEDevice::createServer();
+  // Serial.println("About to call MyServerCallbacks");
+  // pServer->setCallbacks(new MyServerCallbacks());
+  // Serial.println("Just called MyServerCallbacks");
 
-  BLEService* pService = pServer->createService(SERVICE_UUID);
-  pCharacteristic = pService->createCharacteristic(
-                      CHARACTERISTIC_UUID,
-                      BLECharacteristic::PROPERTY_READ |
-                      BLECharacteristic::PROPERTY_NOTIFY
-                  );
+  // BLEService* pService = pServer->createService(SERVICE_UUID);
+  // pCharacteristic = pService->createCharacteristic(
+  //                     CHARACTERISTIC_UUID,
+  //                     BLECharacteristic::PROPERTY_READ |
+  //                     BLECharacteristic::PROPERTY_NOTIFY
+  //                 );
 
-  pService->start();
-  BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pServer->getAdvertising()->start();
+  // pService->start();
+  // BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+  // pAdvertising->addServiceUUID(SERVICE_UUID);
+  // pServer->getAdvertising()->start();
 
   /*
   First we configure the wake up source
@@ -320,6 +338,18 @@ void setup(){
     
     loop();
   }
+  
+  digitalWrite(LED_DUTY_CYCLE, HIGH);  // Turn ON duty cycle LED
+  isSleeping = false;  // Reset sleep flag
+
+  delay(3000);  // Simulating sensor readings
+
+  Serial.println("Going to sleep now");
+  digitalWrite(LED_DUTY_CYCLE, LOW);   // Turn OFF duty cycle LED
+  isSleeping = true;  // Set sleep flag for next boot
+
+  delay(1000);
+  
   prepareForDeepSleep();
 
   Serial.println("This will never be printed");
