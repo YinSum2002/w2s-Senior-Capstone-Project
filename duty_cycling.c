@@ -41,14 +41,15 @@ RTC_DATA_ATTR unsigned long awakeDuration = 0;
 #define SERVICE_UUID "12345678-1234-5678-1234-56789abcdef0"
 #define CHARACTERISTIC_UUID "abcd1234-5678-1234-5678-abcdef123456"
 
-#define PH_SENSOR_PIN 0  // GPIO 0 connected to the sensor's analog output
-#define SOIL_MOISTURE_PIN 1  // GPIO 1 connected to the sensor's analog output
+#define PH_SENSOR_PIN 4  // GPIO 0 connected to the sensor's analog output
+#define SOIL_MOISTURE_PIN 5  // GPIO 1 connected to the sensor's analog output
 
-#define LED_DUTY_CYCLE 18  // LED indicating ESP is awake (duty cycling)
+#define LED_DUTY_CYCLE 18   // LED indicating ESP is awake (duty cycling)
 #define LED_SLEEP 19        // LED indicating ESP is in deep sleep
+#define LED_BLE 10          // LED indicating ESP is transmitting data
 
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  20        /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP  5        /* Time ESP32 will go to sleep (in seconds) */
 #define MAX_ARRAY 300
 
 BLEServer* pServer = NULL;
@@ -149,6 +150,7 @@ void setup(){
 
   pinMode(LED_DUTY_CYCLE, OUTPUT);
   pinMode(LED_SLEEP, OUTPUT);
+  pinMode(LED_BLE, OUTPUT);
 
   delay(1000); //Take some time to open up the Serial Monitor
 
@@ -335,8 +337,10 @@ void setup(){
   // Serial.println("Still accepting changes");
 
   if (loopCounter % 6 == 0){
-    
+    digitalWrite(LED_BLE, HIGH); // Turn ON BLE LED
     loop();
+    delay(1000);
+    digitalWrite(LED_BLE, LOW);  // Turn OFF BLE LED
   }
   
   digitalWrite(LED_DUTY_CYCLE, HIGH);  // Turn ON duty cycle LED
@@ -345,7 +349,7 @@ void setup(){
   delay(3000);  // Simulating sensor readings
 
   Serial.println("Going to sleep now");
-  digitalWrite(LED_DUTY_CYCLE, LOW);   // Turn OFF duty cycle LED
+  digitalWrite(LED_DUTY_CYCLE, LOW);   // Turn OFF duty cycle LED. 
   isSleeping = true;  // Set sleep flag for next boot
 
   delay(1000);
