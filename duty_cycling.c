@@ -41,12 +41,12 @@ RTC_DATA_ATTR unsigned long awakeDuration = 0;
 #define SERVICE_UUID "12345678-1234-5678-1234-56789abcdef0"
 #define CHARACTERISTIC_UUID "abcd1234-5678-1234-5678-abcdef123456"
 
-#define PH_SENSOR_PIN 4  // GPIO 0 connected to the sensor's analog output
-#define SOIL_MOISTURE_PIN 5  // GPIO 1 connected to the sensor's analog output
+#define PH_SENSOR_PIN 32  // GPIO 32 connected to the sensor's analog output
+#define SOIL_MOISTURE_PIN 33  // GPIO 33 connected to the sensor's analog output
 
-#define LED_DUTY_CYCLE 18   // LED indicating ESP is awake (duty cycling)
-#define LED_SLEEP 19        // LED indicating ESP is in deep sleep
-#define LED_BLE 10          // LED indicating ESP is transmitting data
+#define LED_DUTY_CYCLE 4   // LED indicating ESP is awake (duty cycling)
+#define LED_SLEEP 16        // LED indicating ESP is in deep sleep
+#define LED_BLE 17          // LED indicating ESP is transmitting data
 
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  5        /* Time ESP32 will go to sleep (in seconds) */
@@ -202,8 +202,8 @@ void setup(){
 
   while (!Serial);
   Wire.end();
-  // Initialize I2C GPIO 8 (SCL) and GPIO 9 (SDA)
-  Wire.begin(9, 8);
+  // Initialize I2C GPIO 25 (SCL) and GPIO 26 (SDA)
+  Wire.begin(26, 25);
 
   delay(100);  // Give sensors time to wake up
 
