@@ -26,6 +26,8 @@ Pranav Cherukupalli <cherukupallip@gmail.com>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <SPI.h>
+#include <SD.h>
 
 // Create sensor instances
 Adafruit_AHTX0 aht;
@@ -38,6 +40,7 @@ RTC_DATA_ATTR unsigned long wakeupTime = 0;
 RTC_DATA_ATTR unsigned long sleepTime = 0;
 RTC_DATA_ATTR unsigned long awakeDuration = 0;
 
+#define SD_CS 5  // Chip Select pin
 #define SERVICE_UUID "12345678-1234-5678-1234-56789abcdef0"
 #define CHARACTERISTIC_UUID "abcd1234-5678-1234-5678-abcdef123456"
 
