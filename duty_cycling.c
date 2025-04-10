@@ -23,6 +23,7 @@ Pranav Cherukupalli <cherukupallip@gmail.com>
 #include <Adafruit_AHTX0.h>
 #include <Adafruit_TSL2591.h>
 #include <Adafruit_VEML6075.h>
+#include <ArduinoJson.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
