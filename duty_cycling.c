@@ -31,7 +31,6 @@ Pranav Cherukupalli <cherukupallip@gmail.com>
 #include <SD.h>
 
 // Create sensor instances
-Adafruit_AHTX0 aht;
 Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591);
 Adafruit_VEML6075 uv = Adafruit_VEML6075();
 
@@ -68,9 +67,7 @@ RTC_DATA_ATTR bool isSleeping = false;  // RTC variable to track sleep state
 RTC_DATA_ATTR struct sensorData {
     char label[6];
     float values[MAX_ARRAY];
-} sensors[6] = {
-    {"TEMP", {0}},  // Temperature values
-    {"HUMID", {0}}, // Humidity values
+} sensors[4] = {
     {"LUX", {0}},   // Light values
     {"SOIL", {0}},  // Soil moisture values
     {"UV", {0}},    // UV index values
@@ -96,30 +93,10 @@ void configureSensor() {
   tsl.setTiming(TSL2591_INTEGRATIONTIME_100MS); // Options: 100MS, 200MS, 300MS, 400MS, 500MS, 600MS
 }
 
-/*
-Method to print the reason by which ESP32
-has been awaken from sleep
-*/
-void print_wakeup_reason(){
-  esp_sleep_wakeup_cause_t wakeup_reason;
-
-  wakeup_reason = esp_sleep_get_wakeup_cause();
-
-  switch(wakeup_reason)
-  {
-    case ESP_SLEEP_WAKEUP_EXT0 : Serial.println("Wakeup caused by external signal using RTC_IO"); break;
-    case ESP_SLEEP_WAKEUP_EXT1 : Serial.println("Wakeup caused by external signal using RTC_CNTL"); break;
-    case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Wakeup caused by timer"); break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD : Serial.println("Wakeup caused by touchpad"); break;
-    case ESP_SLEEP_WAKEUP_ULP : Serial.println("Wakeup caused by ULP program"); break;
-    default : Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
-  }
-}
-
 void printSensorData() {
     Serial.println("Stored Sensor Data:");
 
-    for (int i = 0; i < 6; i++) {  // Loop through the 6 sensors
+    for (int i = 0; i < 4; i++) {  // Loop through the 6 sensors
         Serial.print(sensors[i].label);
         Serial.print(": [");
 
@@ -175,34 +152,11 @@ void setup(){
   ++bootCount;
   Serial.println("Boot number: " + String(bootCount));
 
-  //Print the wakeup reason for ESP32
-  print_wakeup_reason();
-
-  // BLEDevice::init("RFID #12345");
-  // pServer = BLEDevice::createServer();
-  // Serial.println("About to call MyServerCallbacks");
-  // pServer->setCallbacks(new MyServerCallbacks());
-  // Serial.println("Just called MyServerCallbacks");
-
-  // BLEService* pService = pServer->createService(SERVICE_UUID);
-  // pCharacteristic = pService->createCharacteristic(
-  //                     CHARACTERISTIC_UUID,
-  //                     BLECharacteristic::PROPERTY_READ |
-  //                     BLECharacteristic::PROPERTY_NOTIFY
-  //                 );
-
-  // pService->start();
-  // BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
-  // pAdvertising->addServiceUUID(SERVICE_UUID);
-  // pServer->getAdvertising()->start();
-
   /*
   First we configure the wake up source
   We set our ESP32 to wake up every 5 seconds
   */
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-  Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) +
-  " Seconds");
 
   while (!Serial);
   Wire.end();
@@ -210,12 +164,6 @@ void setup(){
   Wire.begin(26, 25);
 
   delay(100);  // Give sensors time to wake up
-
-  // Reinitialize all sensors
-  if (!aht.begin()) {
-      Serial.println("Failed to initialize AHT20 sensor!");
-      while (1);
-  }
 
   if (!tsl.begin()) {
       Serial.println(F("Could not find a valid TSL2591 sensor, check wiring!"));
@@ -232,16 +180,20 @@ void setup(){
   loopCounter++;
 
   if (loopCounter % 1 == 0){
-    // Run the AHT20
-    sensors_event_t humidity, temp;
-    aht.getEvent(&humidity, &temp);
+    // Get full-spectrum (visible + IR) and IR-only light levels
+    uint32_t full = tsl.getFullLuminosity();
+    uint16_t visible = full & 0xFFFF;
+    uint16_t infrared = full >> 16;
 
-    sensors[0].values[loopCounter/1] = temp.temperature;
-    sensors[1].values[loopCounter/1] = humidity.relative_humidity;
+    // Calculate Lux from the sensor readings
+    float lux = tsl.calculateLux(visible, infrared);
 
-    // Print AHT20 readings
-    Serial.print("Temp: "); Serial.print(temp.temperature); Serial.println(" °C");
-    Serial.print("Humidity: "); Serial.print(humidity.relative_humidity); Serial.println(" %");
+    sensors[0].values[loopCounter/3] = lux;
+
+    // Print TSL2591 readings
+    Serial.print(F("Visible Light: ")); Serial.print(visible);
+    Serial.print(F(" | Infrared: ")); Serial.print(infrared);
+    Serial.print(F(" | Lux: ")); Serial.println(lux);
   }
 
   if (loopCounter % 2 == 0){
@@ -257,7 +209,7 @@ void setup(){
     float moisture_percent = map(raw_value, min_raw, max_raw, 0, 100);
     moisture_percent = constrain(moisture_percent, 0, 100); // Ensure the value stays within 0-100%
 
-    sensors[3].values[loopCounter/2] = moisture_percent;
+    sensors[1].values[loopCounter/2] = moisture_percent;
 
     // Print the readings to the Serial Monitor
     Serial.print("Raw ADC Value: ");
@@ -265,30 +217,13 @@ void setup(){
     Serial.print(" | Soil Moisture: ");
     Serial.print(moisture_percent, 1);  // Print moisture percentage with 1 decimal place
     Serial.println("%");
-  }
-
-  if (loopCounter % 3 == 0){
-    // Get full-spectrum (visible + IR) and IR-only light levels
-    uint32_t full = tsl.getFullLuminosity();
-    uint16_t visible = full & 0xFFFF;
-    uint16_t infrared = full >> 16;
-
-    // Calculate Lux from the sensor readings
-    float lux = tsl.calculateLux(visible, infrared);
-
-    sensors[2].values[loopCounter/3] = lux;
-
-    // Print TSL2591 readings
-    Serial.print(F("Visible Light: ")); Serial.print(visible);
-    Serial.print(F(" | Infrared: ")); Serial.print(infrared);
-    Serial.print(F(" | Lux: ")); Serial.println(lux);
 
     // // Read UVA, UVB, and calculate UV Index
     float uva = uv.readUVA();
     float uvb = uv.readUVB();
     float uvIndex = uv.readUVI();
 
-    sensors[4].values[loopCounter/3] = uva;
+    sensors[2].values[loopCounter/3] = uva;
 
     // Print the readings to the Serial Monitor
     Serial.print("UVA: ");
@@ -297,7 +232,9 @@ void setup(){
     Serial.print(uvb);
     Serial.print(" | UV Index: ");
     Serial.println(uvIndex);
+  }
 
+  if (loopCounter % 3 == 0){
     // Read the raw ADC value from the pH sensor
     int raw_ADC_value = analogRead(PH_SENSOR_PIN);
 
@@ -307,7 +244,7 @@ void setup(){
     // Convert the voltage to pH value using calibration
     float pH = 3.5 * voltage;  // Adjust the multiplier and offset as needed
 
-    sensors[5].values[loopCounter/3] = pH;
+    sensors[3].values[loopCounter/3] = pH;
 
     // Print pH readings
     Serial.print("Raw ADC Value: ");
@@ -378,8 +315,8 @@ void loop(){
   if (deviceConnected && !dataSent) {
     Serial.println("Waiting for BLE to be ready...");
     delay(2000);  // Give BLE some time before sending
-    for (int i = 0; i < 6; i++) {  // Loop through each sensor type
-        Serial.println("Entered loop of 6");
+    for (int i = 0; i < 4; i++) {  // Loop through each sensor type
+        Serial.println("Entered loop of 4");
         for (int j = 0; j <= loopCounter; j++) {  // Loop through stored values
             Serial.println("Entered loop of loopCounter");
             if (sensors[i].values[j] != 0.0) {  // Skip zero values
