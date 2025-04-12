@@ -1,24 +1,3 @@
-/*
-Simple Deep Sleep with Timer Wake Up
-=====================================
-ESP32 offers a deep sleep mode for effective power
-saving as power is an important factor for IoT
-applications. In this mode CPUs, most of the RAM,
-and all the digital peripherals which are clocked
-from APB_CLK are powered off. The only parts of
-the chip which can still be powered on are:
-RTC controller, RTC peripherals ,and RTC memories
-
-This code displays the most basic deep sleep with
-a timer to wake it up and how to store data in
-RTC memory to use it over reboots
-
-This code is under Public Domain License.
-
-Author:
-Pranav Cherukupalli <cherukupallip@gmail.com>
-*/
-
 #include <Wire.h>
 #include <Adafruit_AHTX0.h>
 #include <Adafruit_TSL2591.h>
@@ -54,6 +33,10 @@ RTC_DATA_ATTR unsigned long awakeDuration = 0;
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  5        /* Time ESP32 will go to sleep (in seconds) */
 #define MAX_ARRAY 300
+
+#define MAX_JSON_ENTRIES 100  // Tune this as needed for memory constraints
+RTC_DATA_ATTR char rtc_json_data[2048];  // Persisted JSON string buffer
+RTC_DATA_ATTR int rtc_json_size = 0;     // Track current size of data
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pCharacteristic = NULL;
@@ -91,6 +74,33 @@ void configureSensor() {
   // Set gain and integration time for the TSL2591
   tsl.setGain(TSL2591_GAIN_MED);        // Options: LOW, MED, HIGH, MAX
   tsl.setTiming(TSL2591_INTEGRATIONTIME_100MS); // Options: 100MS, 200MS, 300MS, 400MS, 500MS, 600MS
+}
+
+void appendSensorSnapshot(float* sensorVals, bool* includeFlags) {
+  StaticJsonDocument<512> newEntry;
+
+  newEntry["timestamp"] = millis();  // Or use RTC time if available
+  if (includeFlags[0]) newEntry["lux"] = sensorVals[0];
+  if (includeFlags[1]) newEntry["moisture"] = sensorVals[1];
+  if (includeFlags[2]) newEntry["uv"] = sensorVals[2];
+  if (includeFlags[3]) newEntry["ph"] = sensorVals[3];
+
+  StaticJsonDocument<4096> doc;
+  if (rtc_json_size > 0) {
+    DeserializationError error = deserializeJson(doc, rtc_json_data);
+    if (error) {
+      Serial.println("Failed to deserialize RTC JSON. Starting fresh.");
+      doc.clear();
+    }
+  }
+
+  JsonArray dataArray = doc.to<JsonArray>();
+  dataArray.add(newEntry);
+
+  rtc_json_size = serializeJson(doc, rtc_json_data);
+  Serial.println("Snapshot stored to RTC memory:");
+  serializeJsonPretty(doc, Serial);
+  Serial.println();
 }
 
 void printSensorData() {
@@ -179,6 +189,9 @@ void setup(){
 
   loopCounter++;
 
+  float sensorVals[4];
+  bool includeFlags[4] = {false, false, false, false};
+
   if (loopCounter % 1 == 0){
     // Get full-spectrum (visible + IR) and IR-only light levels
     uint32_t full = tsl.getFullLuminosity();
@@ -187,6 +200,9 @@ void setup(){
 
     // Calculate Lux from the sensor readings
     float lux = tsl.calculateLux(visible, infrared);
+
+    sensorVals[0] = lux;
+    includeFlags[0] = true;
 
     sensors[0].values[loopCounter/3] = lux;
 
@@ -209,7 +225,10 @@ void setup(){
     float moisture_percent = map(raw_value, min_raw, max_raw, 0, 100);
     moisture_percent = constrain(moisture_percent, 0, 100); // Ensure the value stays within 0-100%
 
-    sensors[1].values[loopCounter/2] = moisture_percent;
+    sensorVals[1] = moisture_percent;
+    includeFlags[1] = true;
+
+    sensors[1].values[loopCounter/3] = moisture_percent;
 
     // Print the readings to the Serial Monitor
     Serial.print("Raw ADC Value: ");
@@ -222,6 +241,9 @@ void setup(){
     float uva = uv.readUVA();
     float uvb = uv.readUVB();
     float uvIndex = uv.readUVI();
+
+    sensorVals[2] = uva;
+    includeFlags[2] = true;
 
     sensors[2].values[loopCounter/3] = uva;
 
@@ -244,6 +266,9 @@ void setup(){
     // Convert the voltage to pH value using calibration
     float pH = 3.5 * voltage;  // Adjust the multiplier and offset as needed
 
+    sensorVals[3] = pH;
+    includeFlags[3] = true;
+
     sensors[3].values[loopCounter/3] = pH;
 
     // Print pH readings
@@ -255,27 +280,7 @@ void setup(){
     Serial.println(pH, 2);
   }
 
-  /*
-  Next we decide what all peripherals to shut down/keep on
-  By default, ESP32 will automatically power down the peripherals
-  not needed by the wakeup source, but if you want to be a poweruser
-  this is for you. Read in detail at the API docs
-  http://esp-idf.readthedocs.io/en/latest/api-reference/system/deep_sleep.html
-  Left the line commented as an example of how to configure peripherals.
-  The line below turns off all RTC peripherals in deep sleep.
-  */
-  //esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
-  //Serial.println("Configured all RTC Peripherals to be powered down in sleep");
-
-  /*
-  Now that we have setup a wake cause and if needed setup the
-  peripherals state in deep sleep, we can now start going to
-  deep sleep.
-  In the case that no wake up sources were provided but deep
-  sleep was started, it will sleep forever unless hardware
-  reset occurs.
-  */
-  // Serial.println("Still accepting changes");
+  appendSensorSnapshot(sensorVals, includeFlags);
 
   if (loopCounter % 6 == 0){
     digitalWrite(LED_BLE, HIGH); // Turn ON BLE LED
