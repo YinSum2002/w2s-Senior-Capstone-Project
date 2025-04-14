@@ -108,6 +108,20 @@ void appendSensorSnapshot(float* sensorVals, bool* includeFlags) {
   Serial.println("\n");
   Serial.println(rtc_json_data);
   Serial.println();
+
+  // Write entire JSON to SD card
+  if (SD.exists("/data.json")) {
+    SD.remove("/data.json");  // Remove previous version of file
+  }
+
+  File file = SD.open("/data.json", FILE_WRITE);
+  if (file) {
+    file.print(rtc_json_data);  // Write entire updated JSON data
+    file.close();
+    Serial.println("Data successfully written to SD card.");
+  } else {
+    Serial.println("Failed to open SD file for writing.");
+  }
 }
 
 void printSensorData() {
@@ -285,6 +299,12 @@ void setup(){
     Serial.print(voltage, 2);
     Serial.print(" V | pH: ");
     Serial.println(pH, 2);
+  }
+
+  // Initialize SD card
+  if (!SD.begin(SD_CS)) {
+      Serial.println("SD card initialization failed!");
+      return;
   }
 
   appendSensorSnapshot(sensorVals, includeFlags);
