@@ -94,12 +94,19 @@ void appendSensorSnapshot(float* sensorVals, bool* includeFlags) {
     }
   }
 
-  JsonArray dataArray = doc.to<JsonArray>();
+  JsonArray dataArray;
+  if (!doc.is<JsonArray>()) {
+    dataArray = doc.to<JsonArray>();  // First time: create array
+  } else {
+    dataArray = doc.as<JsonArray>();  // Append to existing
+  }
   dataArray.add(newEntry);
 
   rtc_json_size = serializeJson(doc, rtc_json_data);
-  Serial.println("Snapshot stored to RTC memory:");
+  Serial.println("Snapshot stored to RTC memory:\n");
   serializeJsonPretty(doc, Serial);
+  Serial.println("\n");
+  Serial.println(rtc_json_data);
   Serial.println();
 }
 
