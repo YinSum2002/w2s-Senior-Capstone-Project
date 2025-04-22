@@ -78,17 +78,77 @@ void configureSensor() {
   tsl.setTiming(TSL2591_INTEGRATIONTIME_100MS); // Options: 100MS, 200MS, 300MS, 400MS, 500MS, 600MS
 }
 
+void clearRTCData() {
+  for (int i = 0; i < 4; i++) {
+    // Optional: clear the label too, if needed
+    // memset(sensors[i].label, 0, sizeof(sensors[i].label));
+    
+    // Zero out all sensor values
+    for (int j = 0; j < MAX_ARRAY; j++) {
+      sensors[i].values[j] = 0;
+    }
+  }
+  Serial.println("RTC sensor data cleared.");
+}
+
 void appendSensorSnapshot() {
+  // Step 1: Check the number of files on the SD card
+  int fileCount = 0;
+  String filenamePrefix = "/cycle_";
+  File root = SD.open("/");
+  
+  // Count the number of files that start with "cycle_"
+  while (File file = root.openNextFile()) {
+    if (file.isDirectory()) continue;
+    if (String(file.name()).startsWith(filenamePrefix)) {
+      fileCount++;
+    }
+    file.close();
+  }
+
+  // Step 2: If there are 8 files, delete the oldest one
+  if (fileCount >= 8) {
+    int oldestFileIndex = -1;
+    int oldestFileValue = INT_MAX;
+
+    // Loop through the files again to find the one with the smallest index
+    root.rewindDirectory();
+    while (File file = root.openNextFile()) {
+      if (file.isDirectory()) continue;
+      if (String(file.name()).startsWith(filenamePrefix)) {
+        int fileIndex = extractFileIndex(file.name());
+        if (fileIndex < oldestFileValue) {
+          oldestFileValue = fileIndex;
+          oldestFileIndex = fileIndex;
+        }
+      }
+      file.close();
+    }
+
+    // Step 3: Delete the oldest file
+    if (oldestFileIndex != -1) {
+      String oldestFileName = filenamePrefix + String(oldestFileIndex) + ".json";
+      SD.remove(oldestFileName.c_str());
+      Serial.println("Deleted oldest file: " + oldestFileName);
+    }
+  }
+
+  // Step 4: Create a new file and save the data
   StaticJsonDocument<1024> doc;
-  JsonArray root = doc.to<JsonArray>();
-  JsonObject container = root.createNestedObject();
+  JsonArray rootJson = doc.to<JsonArray>();
+  JsonObject container = rootJson.createNestedObject();
   JsonObject tagData = container.createNestedObject("12345");
 
   // Loop through each sensor
   for (int i = 0; i < 4; i++) {
     JsonArray arr = tagData.createNestedArray(sensors[i].label);
     for (int j = 0; j < loopCounter; j++) {
-      arr.add(sensors[i].values[j]);
+      // Check if the value is zero, and replace it with null (None in JSON)
+      if (sensors[i].values[j] == 0) {
+        arr.add(nullptr);  // Add null instead of zero
+      } else {
+        arr.add(sensors[i].values[j]);
+      }
     }
   }
 
@@ -108,6 +168,13 @@ void appendSensorSnapshot() {
   }
 }
 
+// Helper function to extract the numerical index from a filename
+int extractFileIndex(String filename) {
+  int startIdx = filename.indexOf('_') + 1;
+  int endIdx = filename.indexOf('.');
+  String fileIndexStr = filename.substring(startIdx, endIdx);
+  return fileIndexStr.toInt();
+}
 
 void printSensorData() {
     Serial.println("Stored Sensor Data:");
@@ -200,7 +267,7 @@ void setup(){
 
   if (loopCounter % 1 == 0){
     // Read the raw analog value from the sensor
-    int raw_value = analogRead(SOIL_MOISTURE_PIN);
+    float raw_value = analogRead(SOIL_MOISTURE_PIN);
 
     // Convert the raw value to a percentage (assuming 0-100%)
     // Calibration: You may need to determine the min (dry) and max (wet) raw values for your sensor
@@ -264,7 +331,7 @@ void setup(){
 
   if (loopCounter % 12 == 0){
     // Read the raw ADC value from the pH sensor
-    int raw_ADC_value = analogRead(PH_SENSOR_PIN);
+    float raw_ADC_value = analogRead(PH_SENSOR_PIN);
 
     // Convert raw value to voltage (ESP32 ADC resolution is 12-bit by default)
     float voltage = (raw_ADC_value / 4095.0) * 3.3;
@@ -299,6 +366,10 @@ void setup(){
     loop();
     delay(1000);
     digitalWrite(LED_BLE, LOW);  // Turn OFF BLE LED
+
+    // Clear RTC memory after data is successfully written to the SD card
+    clearRTCData();  // Custom function to clear RTC memory
+    loopCounter = 0;
   }
   
   digitalWrite(LED_DUTY_CYCLE, HIGH);  // Turn ON duty cycle LED
