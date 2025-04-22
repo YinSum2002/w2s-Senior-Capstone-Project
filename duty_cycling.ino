@@ -342,12 +342,13 @@ void setup(){
 void loop(){
   //This is not going to be called
   // Serial.println("We are in the loop");
+  unsigned long connectionStartTime = millis();
+  const unsigned long timeoutDuration = 30000; // 30 seconds until timeout
 
   if (!BLE_setup) {
     BLEDevice::init("RFID #136395207");
-
+    BLEDevice::setMTU(200);  // Max MTU for ESP32
     pServer = BLEDevice::createServer();
-    BLEDevice::setMTU(247);  // Max MTU for ESP32
     // Serial.println("About to call MyServerCallbacks");
     pServer->setCallbacks(new MyServerCallbacks());
     // Serial.println("Just called MyServerCallbacks");
@@ -375,58 +376,60 @@ void loop(){
 
   printSensorData();
 
-  // Serial.println("deviceConnected: " + String(deviceConnected));
-  // Serial.println("dataSent: " + String(dataSent));
-/*
-  if (deviceConnected){
-    Serial.println("deviceConnected");
-  }
-  if (!dataSent){
-    Serial.println("!dataSent");
-  } */
-
-  while (!deviceConnected) {
+  while (!deviceConnected && (millis() - connectionStartTime < timeoutDuration)) {
     delay(100);  // Small delay to avoid CPU overuse
   }
 
   Serial.println("BLE device connected!");
 
-  const int chunkSize = 500;  // Adjust based on your BLE MTU
+  Serial.print("RTC Data Length: ");
+  Serial.println(strlen(rtc_json_data));
+  Serial.println(rtc_json_data);
 
-  for (int s = 0; s < 4; s++) {
-    String dataBlock = String(sensors[s].label) + ":";
+  const int chunkSize = 197;  // Safe BLE payload size
+  int jsonLength = strlen(rtc_json_data);
+  Serial.print("Total JSON size: ");
+  Serial.println(jsonLength);
 
-    for (int i = 0; i < MAX_ARRAY; i++) {
-      dataBlock += String(sensors[s].values[i], 2); // Two decimal places
-      if (i < MAX_ARRAY - 1) dataBlock += ",";
-    }
+  if (deviceConnected && !dataSent) {
+    dataSent = false;
+    delay(2500);
+    for (int i = 0; i < jsonLength; i += chunkSize) {
+      char chunk[chunkSize + 1];
+      int len = min(chunkSize, jsonLength - i);
+      strncpy(chunk, rtc_json_data + i, len);
+      chunk[len] = '\0';
 
-    // Break dataBlock into chunks
-    int totalLen = dataBlock.length();
-    int numChunks = (totalLen + chunkSize - 1) / chunkSize;
+      Serial.print("Sending chunk: ");
+      Serial.println(chunk);  // See what you're sending
 
-    Serial.printf("Sending sensor %s in %d chunk(s)...\n", sensors[s].label, numChunks);
-
-    for (int j = 0; j < numChunks; j++) {
-      int start = j * chunkSize;
-      int end = min(start + chunkSize, totalLen);
-      String chunk = dataBlock.substring(start, end);
-
-      pCharacteristic->setValue(chunk.c_str());
+      pCharacteristic->setValue((uint8_t*)chunk, len);
       pCharacteristic->notify();
 
-      Serial.printf("Sent chunk %d/%d for %s (%d bytes)\n", j + 1, numChunks, sensors[s].label, chunk.length());
-      delay(1000);  // Small delay for central to process
+      delay(1000);  // Can experiment with shorter delays too
     }
 
     // Step 3: Optional end marker
     pCharacteristic->setValue("END");
     pCharacteristic->notify();
 
+    // Clear the JSON buffer
+    memset(rtc_json_data, 0, sizeof(rtc_json_data));
+    rtc_json_size = 0;    
+    
     dataSent = true;
     Serial.println("All data sent. Disconnecting...");
+    
+    BLE_setup = false;
+    pServer->disconnect(0);  // Force disconnect
+    return;
+    
+  } else {
+    Serial.println("Connection timeout. Resuming data collection loop.");
+
     BLE_setup = false;
     pServer->disconnect(0);  // Force disconnect
     return;
   }
+
 }
