@@ -31,7 +31,7 @@ RTC_DATA_ATTR unsigned long awakeDuration = 0;
 #define LED_BLE 17          // LED indicating ESP is transmitting data
 
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  5        /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP  2        /* Time ESP32 will go to sleep (in seconds) */
 #define MAX_ARRAY 300
 
 #define MAX_JSON_ENTRIES 100  // Tune this as needed for memory constraints
@@ -199,26 +199,6 @@ void setup(){
   bool includeFlags[4] = {false, false, false, false};
 
   if (loopCounter % 1 == 0){
-    // Get full-spectrum (visible + IR) and IR-only light levels
-    uint32_t full = tsl.getFullLuminosity();
-    uint16_t visible = full & 0xFFFF;
-    uint16_t infrared = full >> 16;
-
-    // Calculate Lux from the sensor readings
-    float lux = tsl.calculateLux(visible, infrared);
-
-    sensorVals[0] = lux;
-    includeFlags[0] = true;
-
-    sensors[0].values[loopCounter - 1] = lux;
-
-    // Print TSL2591 readings
-    Serial.print(F("Visible Light: ")); Serial.print(visible);
-    Serial.print(F(" | Infrared: ")); Serial.print(infrared);
-    Serial.print(F(" | Lux: ")); Serial.println(lux);
-  }
-
-  if (loopCounter % 2 == 0){
     // Read the raw analog value from the sensor
     int raw_value = analogRead(SOIL_MOISTURE_PIN);
 
@@ -234,7 +214,7 @@ void setup(){
     sensorVals[1] = moisture_percent;
     includeFlags[1] = true;
 
-    sensors[1].values[loopCounter/3] = moisture_percent;
+    sensors[1].values[loopCounter - 1] = moisture_percent;
 
     // Print the readings to the Serial Monitor
     Serial.print("Raw ADC Value: ");
@@ -242,6 +222,26 @@ void setup(){
     Serial.print(" | Soil Moisture: ");
     Serial.print(moisture_percent, 1);  // Print moisture percentage with 1 decimal place
     Serial.println("%");
+  }
+
+  if (loopCounter % 2 == 0){
+        // Get full-spectrum (visible + IR) and IR-only light levels
+    uint32_t full = tsl.getFullLuminosity();
+    uint16_t visible = full & 0xFFFF;
+    uint16_t infrared = full >> 16;
+
+    // Calculate Lux from the sensor readings
+    float lux = tsl.calculateLux(visible, infrared);
+
+    sensorVals[0] = lux;
+    includeFlags[0] = true;
+
+    sensors[0].values[loopCounter/2] = lux;
+
+    // Print TSL2591 readings
+    Serial.print(F("Visible Light: ")); Serial.print(visible);
+    Serial.print(F(" | Infrared: ")); Serial.print(infrared);
+    Serial.print(F(" | Lux: ")); Serial.println(lux);
 
     // // Read UVA, UVB, and calculate UV Index
     float uva = uv.readUVA();
@@ -251,7 +251,7 @@ void setup(){
     sensorVals[2] = uva;
     includeFlags[2] = true;
 
-    sensors[2].values[loopCounter/3] = uva;
+    sensors[2].values[loopCounter/2] = uva;
 
     // Print the readings to the Serial Monitor
     Serial.print("UVA: ");
@@ -262,7 +262,7 @@ void setup(){
     Serial.println(uvIndex);
   }
 
-  if (loopCounter % 3 == 0){
+  if (loopCounter % 12 == 0){
     // Read the raw ADC value from the pH sensor
     int raw_ADC_value = analogRead(PH_SENSOR_PIN);
 
@@ -275,7 +275,7 @@ void setup(){
     sensorVals[3] = pH;
     includeFlags[3] = true;
 
-    sensors[3].values[loopCounter/3] = pH;
+    sensors[3].values[loopCounter/12] = pH;
 
     // Print pH readings
     Serial.print("Raw ADC Value: ");
@@ -293,7 +293,7 @@ void setup(){
   }
   
 
-  if (loopCounter % 6 == 0){
+  if (loopCounter % 12 == 0){
     digitalWrite(LED_BLE, HIGH); // Turn ON BLE LED
     appendSensorSnapshot();
     loop();
