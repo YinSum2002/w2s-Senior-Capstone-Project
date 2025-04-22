@@ -37,6 +37,8 @@ RTC_DATA_ATTR unsigned long awakeDuration = 0;
 #define MAX_JSON_ENTRIES 100  // Tune this as needed for memory constraints
 RTC_DATA_ATTR char rtc_json_data[2048];  // Persisted JSON string buffer
 RTC_DATA_ATTR int rtc_json_size = 0;     // Track current size of data
+RTC_DATA_ATTR int fileIndex = 0;
+
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pCharacteristic = NULL;
@@ -76,53 +78,36 @@ void configureSensor() {
   tsl.setTiming(TSL2591_INTEGRATIONTIME_100MS); // Options: 100MS, 200MS, 300MS, 400MS, 500MS, 600MS
 }
 
-void appendSensorSnapshot(float* sensorVals, bool* includeFlags) {
-  StaticJsonDocument<512> newEntry;
+void appendSensorSnapshot() {
+  StaticJsonDocument<1024> doc;
+  JsonArray root = doc.to<JsonArray>();
+  JsonObject container = root.createNestedObject();
+  JsonObject tagData = container.createNestedObject("12345");
 
-  newEntry["timestamp"] = millis();  // Or use RTC time if available
-  if (includeFlags[0]) newEntry["lux"] = sensorVals[0];
-  if (includeFlags[1]) newEntry["moisture"] = sensorVals[1];
-  if (includeFlags[2]) newEntry["uv"] = sensorVals[2];
-  if (includeFlags[3]) newEntry["ph"] = sensorVals[3];
-
-  StaticJsonDocument<4096> doc;
-  if (rtc_json_size > 0) {
-    DeserializationError error = deserializeJson(doc, rtc_json_data);
-    if (error) {
-      Serial.println("Failed to deserialize RTC JSON. Starting fresh.");
-      doc.clear();
+  // Loop through each sensor
+  for (int i = 0; i < 4; i++) {
+    JsonArray arr = tagData.createNestedArray(sensors[i].label);
+    for (int j = 0; j < loopCounter; j++) {
+      arr.add(sensors[i].values[j]);
     }
   }
 
-  JsonArray dataArray;
-  if (!doc.is<JsonArray>()) {
-    dataArray = doc.to<JsonArray>();  // First time: create array
-  } else {
-    dataArray = doc.as<JsonArray>();  // Append to existing
-  }
-  dataArray.add(newEntry);
+  // Create a unique filename
+  String filename = "/cycle_" + String(fileIndex) + ".json";
+  fileIndex++;  // Increment for the next write
 
-  rtc_json_size = serializeJson(doc, rtc_json_data);
-  Serial.println("Snapshot stored to RTC memory:\n");
-  serializeJsonPretty(doc, Serial);
-  Serial.println("\n");
-  Serial.println(rtc_json_data);
-  Serial.println();
-
-  // Write entire JSON to SD card
-  if (SD.exists("/data.json")) {
-    SD.remove("/data.json");  // Remove previous version of file
-  }
-
-  File file = SD.open("/data.json", FILE_WRITE);
+  File file = SD.open(filename.c_str(), FILE_WRITE);
   if (file) {
-    file.print(rtc_json_data);  // Write entire updated JSON data
+    serializeJsonPretty(doc, file);
     file.close();
-    Serial.println("Data successfully written to SD card.");
+    Serial.println("Full snapshot written to SD:");
+    serializeJsonPretty(doc, Serial);
+    Serial.println("\nSaved to: " + filename);
   } else {
-    Serial.println("Failed to open SD file for writing.");
+    Serial.println("Failed to write JSON to SD card.");
   }
 }
+
 
 void printSensorData() {
     Serial.println("Stored Sensor Data:");
@@ -225,7 +210,7 @@ void setup(){
     sensorVals[0] = lux;
     includeFlags[0] = true;
 
-    sensors[0].values[loopCounter/3] = lux;
+    sensors[0].values[loopCounter - 1] = lux;
 
     // Print TSL2591 readings
     Serial.print(F("Visible Light: ")); Serial.print(visible);
@@ -306,11 +291,11 @@ void setup(){
       Serial.println("SD card initialization failed!");
       return;
   }
-
-  appendSensorSnapshot(sensorVals, includeFlags);
+  
 
   if (loopCounter % 6 == 0){
     digitalWrite(LED_BLE, HIGH); // Turn ON BLE LED
+    appendSensorSnapshot();
     loop();
     delay(1000);
     digitalWrite(LED_BLE, LOW);  // Turn OFF BLE LED
