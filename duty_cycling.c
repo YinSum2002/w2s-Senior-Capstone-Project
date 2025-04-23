@@ -34,6 +34,9 @@ RTC_DATA_ATTR unsigned long awakeDuration = 0;
 #define TIME_TO_SLEEP  2        /* Time ESP32 will go to sleep (in seconds) */
 #define MAX_ARRAY 300
 
+// #define rfid 
+#define rfid 136395207
+
 #define MAX_JSON_ENTRIES 100  // Tune this as needed for memory constraints
 RTC_DATA_ATTR char rtc_json_data[2048];  // Persisted JSON string buffer
 RTC_DATA_ATTR int rtc_json_size = 0;     // Track current size of data
@@ -44,6 +47,7 @@ BLEServer* pServer = NULL;
 BLECharacteristic* pCharacteristic = NULL;
 bool deviceConnected = false;
 bool dataSent = false;
+bool BLE_setup = false;
 
 RTC_DATA_ATTR int bootCount = 0;
 
@@ -58,6 +62,8 @@ RTC_DATA_ATTR struct sensorData {
     {"UV", {0}},    // UV index values
     {"PH", {0}}     // pH values
 };
+// Define sizes array separately
+RTC_DATA_ATTR int sizes[4] = {6, 12, 6, 1};  // LUX, SOIL, UV, PH
 
 class MyServerCallbacks : public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
@@ -89,6 +95,23 @@ void clearRTCData() {
     }
   }
   Serial.println("RTC sensor data cleared.");
+}
+
+String serializeSensorData() {
+  String json = "{";
+  json += "\"RFID\":" + String(rfid) + ",";
+
+  for (int i = 0; i < 4; i++) {
+    json += "\"" + String(sensors[i].label) + "\":[";
+    for (int j = 0; j < sizes[i]; j++) {
+      json += String(sensors[i].values[j], 2);  // 2 decimal places
+      if (j < 12 - 1) json += ",";
+    }
+    json += "]";
+    if (i < 3) json += ",";
+  }
+  json += "}";
+  return json;
 }
 
 void appendSensorSnapshot() {
@@ -138,7 +161,7 @@ void appendSensorSnapshot() {
   JsonArray rootJson = doc.to<JsonArray>();
   JsonObject container = rootJson.createNestedObject();
   JsonObject tagData = container.createNestedObject("12345");
-
+  
   // Loop through each sensor
   for (int i = 0; i < 4; i++) {
     JsonArray arr = tagData.createNestedArray(sensors[i].label);
@@ -305,6 +328,7 @@ void setup(){
 
     sensors[0].values[loopCounter/2] = lux;
 
+
     // Print TSL2591 readings
     Serial.print(F("Visible Light: ")); Serial.print(visible);
     Serial.print(F(" | Infrared: ")); Serial.print(infrared);
@@ -388,38 +412,88 @@ void setup(){
   Serial.println("This will never be printed");
 }
 
-void loop(){
-  //This is not going to be called
-  Serial.println("We are in the loop");
+void loop() {
+  unsigned long connectionStartTime = millis();
+  const unsigned long timeoutDuration = 30000; // 30 seconds until timeout
+  const int chunkSize = 197;  // Safe BLE payload size for ESP32
 
-  printSensorData();
+  // --- Setup BLE server if not already set up ---
+  if (!BLE_setup) {
+    BLEDevice::init("RFID #136395207");
+    BLEDevice::setMTU(200);  // Optional: increase MTU
 
-  if (deviceConnected){
-    Serial.println("deviceConnected");
+    pServer = BLEDevice::createServer();
+    pServer->setCallbacks(new MyServerCallbacks());
+
+    BLEService* pService = pServer->createService(SERVICE_UUID);
+    pCharacteristic = pService->createCharacteristic(
+      CHARACTERISTIC_UUID,
+      BLECharacteristic::PROPERTY_READ |
+      BLECharacteristic::PROPERTY_NOTIFY
+    );
+
+    pService->start();
+    BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(SERVICE_UUID);
+    pServer->getAdvertising()->start();
+
+    BLE_setup = true;
   }
-  if (!dataSent){
-    Serial.println("!dataSent");
+
+  printSensorData();  // Optional debug
+
+  // --- Wait for BLE connection or timeout ---
+  while (!deviceConnected && (millis() - connectionStartTime < timeoutDuration)) {
+    delay(100);
   }
+
+  // --- Only send if connected and not already sent ---
   if (deviceConnected && !dataSent) {
-    Serial.println("Waiting for BLE to be ready...");
-    delay(2000);  // Give BLE some time before sending
-    for (int i = 0; i < 4; i++) {  // Loop through each sensor type
-        Serial.println("Entered loop of 4");
-        for (int j = 0; j <= loopCounter; j++) {  // Loop through stored values
-            Serial.println("Entered loop of loopCounter");
-            if (sensors[i].values[j] != 0.0) {  // Skip zero values
-                Serial.println("sensors[i].values[j] != 0.0");
-                String message = String(sensors[i].label) + ":" + String(sensors[i].values[j], 2);
-                pCharacteristic->setValue(message.c_str());
-                pCharacteristic->notify();
-                Serial.println("Sent: " + message);
-                delay(2000);  // Ensures reliable transmission
-            }
-        }
+    dataSent = false;
+    delay(2500);  // Wait a bit before starting transfer
+
+    // Step 1: Serialize the RTC sensor data into a JSON string
+    String jsonData = serializeSensorData();            // Convert struct to JSON
+    const char* rtc_json_data = jsonData.c_str();       // Get raw C string
+    int jsonLength = jsonData.length();                 // Get its length
+
+    Serial.print("RTC Data Length: ");
+    Serial.println(jsonLength);
+    Serial.println(rtc_json_data);
+
+    // Step 2: Send data in chunks
+    for (int i = 0; i < jsonLength; i += chunkSize) {
+      char chunk[chunkSize + 1];                        // +1 for null terminator
+      int len = min(chunkSize, jsonLength - i);         // Adjust last chunk length
+      strncpy(chunk, rtc_json_data + i, len);
+      chunk[len] = '\0';
+
+      Serial.print("Sending chunk: ");
+      Serial.println(chunk);
+
+      pCharacteristic->setValue((uint8_t*)chunk, len);
+      pCharacteristic->notify();
+
+      delay(1000);  // Optional tuning
     }
+
+    // Step 3: Send optional end marker
+    pCharacteristic->setValue("END");
+    pCharacteristic->notify();
 
     dataSent = true;
     Serial.println("All data sent. Disconnecting...");
+
+    BLE_setup = false;
+    pServer->disconnect(0);  // Force disconnect
+    return;
+  }
+
+  // --- If we reach timeout without connection ---
+  else {
+    Serial.println("Connection timeout. Resuming data collection loop.");
+
+    BLE_setup = false;
     pServer->disconnect(0);  // Force disconnect
     return;
   }
