@@ -80,7 +80,7 @@ class MyServerCallbacks : public BLEServerCallbacks {
 
 void configureSensor() {
   // Set gain and integration time for the TSL2591
-  tsl.setGain(TSL2591_GAIN_MED);        // Options: LOW, MED, HIGH, MAX
+  tsl.setGain(TSL2591_GAIN_LOW);        // Options: LOW, MED, HIGH, MAX
   tsl.setTiming(TSL2591_INTEGRATIONTIME_100MS); // Options: 100MS, 200MS, 300MS, 400MS, 500MS, 600MS
 }
 
@@ -100,17 +100,19 @@ void clearRTCData() {
 String serializeSensorData() {
   String json = "{";
   json += "\"RFID\":" + String(rfid) + ",";
+  json += "\"DATA\":{";
 
   for (int i = 0; i < 4; i++) {
     json += "\"" + String(sensors[i].label) + "\":[";
     for (int j = 0; j < sizes[i]; j++) {
-      json += String(sensors[i].values[j], 2);  // 2 decimal places
+      json += String(sensors[i].values[j], 6);
       if (j < 12 - 1) json += ",";
     }
     json += "]";
     if (i < 3) json += ",";
   }
-  json += "}";
+
+  json += "}}";  // Close "data" and root objects
   return json;
 }
 
@@ -332,7 +334,7 @@ void setup(){
     // Print TSL2591 readings
     Serial.print(F("Visible Light: ")); Serial.print(visible);
     Serial.print(F(" | Infrared: ")); Serial.print(infrared);
-    Serial.print(F(" | Lux: ")); Serial.println(lux);
+    Serial.print(F(" | Lux: ")); Serial.print(lux);
 
     // // Read UVA, UVB, and calculate UV Index
     float uva = uv.readUVA();
