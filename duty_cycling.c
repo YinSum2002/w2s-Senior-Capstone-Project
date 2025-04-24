@@ -117,70 +117,32 @@ String serializeSensorData() {
 }
 
 void appendSensorSnapshot() {
-  // Step 1: Check the number of files on the SD card
-  int fileCount = 0;
-  String filenamePrefix = "/cycle_";
-  File root = SD.open("/");
-  
-  // Count the number of files that start with "cycle_"
-  while (File file = root.openNextFile()) {
-    if (file.isDirectory()) continue;
-    if (String(file.name()).startsWith(filenamePrefix)) {
-      fileCount++;
-    }
-    file.close();
-  }
-
-  // Step 2: If there are 8 files, delete the oldest one
-  if (fileCount >= 8) {
-    int oldestFileIndex = -1;
-    int oldestFileValue = INT_MAX;
-
-    // Loop through the files again to find the one with the smallest index
-    root.rewindDirectory();
-    while (File file = root.openNextFile()) {
-      if (file.isDirectory()) continue;
-      if (String(file.name()).startsWith(filenamePrefix)) {
-        int fileIndex = extractFileIndex(file.name());
-        if (fileIndex < oldestFileValue) {
-          oldestFileValue = fileIndex;
-          oldestFileIndex = fileIndex;
-        }
-      }
-      file.close();
-    }
-
-    // Step 3: Delete the oldest file
-    if (oldestFileIndex != -1) {
-      String oldestFileName = filenamePrefix + String(oldestFileIndex) + ".json";
-      SD.remove(oldestFileName.c_str());
-      Serial.println("Deleted oldest file: " + oldestFileName);
-    }
-  }
-
-  // Step 4: Create a new file and save the data
   StaticJsonDocument<1024> doc;
   JsonArray rootJson = doc.to<JsonArray>();
   JsonObject container = rootJson.createNestedObject();
   JsonObject tagData = container.createNestedObject("12345");
-  
-  // Loop through each sensor
+
+  // Fill in sensor data
   for (int i = 0; i < 4; i++) {
     JsonArray arr = tagData.createNestedArray(sensors[i].label);
     for (int j = 0; j < loopCounter; j++) {
-      // Check if the value is zero, and replace it with null (None in JSON)
       if (sensors[i].values[j] == 0) {
-        arr.add(nullptr);  // Add null instead of zero
+        arr.add(nullptr);
       } else {
         arr.add(sensors[i].values[j]);
       }
     }
   }
 
-  // Create a unique filename
+  // Create the rotating filename
   String filename = "/cycle_" + String(fileIndex) + ".json";
-  fileIndex++;  // Increment for the next write
 
+  // Remove old version of the file (since truncate isn't available)
+  if (SD.exists(filename)) {
+    SD.remove(filename);
+  }
+
+  // Write new data to fresh file
   File file = SD.open(filename.c_str(), FILE_WRITE);
   if (file) {
     serializeJsonPretty(doc, file);
@@ -191,14 +153,9 @@ void appendSensorSnapshot() {
   } else {
     Serial.println("Failed to write JSON to SD card.");
   }
-}
 
-// Helper function to extract the numerical index from a filename
-int extractFileIndex(String filename) {
-  int startIdx = filename.indexOf('_') + 1;
-  int endIdx = filename.indexOf('.');
-  String fileIndexStr = filename.substring(startIdx, endIdx);
-  return fileIndexStr.toInt();
+  // Update fileIndex for next cycle
+  fileIndex = (fileIndex + 1) % 8;
 }
 
 void printSensorData() {
