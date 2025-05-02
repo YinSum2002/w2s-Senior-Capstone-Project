@@ -125,12 +125,8 @@ void appendSensorSnapshot() {
   // Fill in sensor data
   for (int i = 0; i < 4; i++) {
     JsonArray arr = tagData.createNestedArray(sensors[i].label);
-    for (int j = 0; j < loopCounter; j++) {
-      if (sensors[i].values[j] == 0) {
-        arr.add(nullptr);
-      } else {
-        arr.add(sensors[i].values[j]);
-      }
+    for (int j = 0; j < sizes[i]; j++) {
+      arr.add(sensors[i].values[j]);
     }
   }
 
@@ -285,7 +281,7 @@ void setup(){
     sensorVals[0] = lux;
     includeFlags[0] = true;
 
-    sensors[0].values[loopCounter/2] = lux;
+    sensors[0].values[(loopCounter - 1)/2] = lux;
 
 
     // Print TSL2591 readings
@@ -301,7 +297,7 @@ void setup(){
     sensorVals[2] = uva;
     includeFlags[2] = true;
 
-    sensors[2].values[loopCounter/2] = uva;
+    sensors[2].values[(loopCounter - 1)/2] = uva;
 
     // Print the readings to the Serial Monitor
     Serial.print("UVA: ");
@@ -325,7 +321,7 @@ void setup(){
     sensorVals[3] = pH;
     includeFlags[3] = true;
 
-    sensors[3].values[loopCounter/12] = pH;
+    sensors[3].values[(loopCounter - 1)/4] = pH;
 
     // Print pH readings
     Serial.print("Raw ADC Value: ");
