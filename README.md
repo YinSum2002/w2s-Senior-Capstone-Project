@@ -17,7 +17,7 @@ Justin and Griffin were the primary contributors to this codebase.
 
 ## Repo Notes
 > ⚠️ Heads up: This repo contains a lot of experimental and test files from the development cycle, and reflects the collaborative nature of a student project. 
-- The primary files for the final version of the Instrumentation Module are duty_cycling.c and demoday.c.
+- The primary files for the final version of the Instrumentation Module are `duty_cycling.c` and `demoday.c`.
 - Code for the GardenHub is not included in this Repo.
 
 ## Lessons Learned
