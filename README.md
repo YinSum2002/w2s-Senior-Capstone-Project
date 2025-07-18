@@ -2,7 +2,7 @@
 
 ## Overview
 The scope of this repo is a partial overview of the Wither Watcher System (W2S). W2S was the senior capstone project of Computer Engineering Undergrads Justin Chan and Griffin Danehy, as well as Electrical Engineers Kam Haghighi and Santino Mei.
-W2S Consisted of two main componenets. The GardenHub, whcih was designed by Santino, and the Instrumentation Module, designed by Justin. Griffin designed the software framework for these two components to communicate, and Kam designed the mechanical hardware to host both the GardenHub and Instrumentation Module.
+W2S Consisted of two main componenets. The GardenHub, which was designed by Santino, and the Instrumentation Module, designed by Justin. Griffin designed the software framework for these two components to communicate, and Kam designed the mechanical hardware to host both the GardenHub and Instrumentation Module.
 
 ## Tech Stack
 - Hardware: [Raspberry Pi Pico → ESP32]
